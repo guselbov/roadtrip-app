@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase"
 import { notFound } from "next/navigation"
 import { StagesSection } from "./StagesSection"
+import { JoinSection } from "./JoinSection"
 
 export default async function TripPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -18,7 +19,10 @@ export default async function TripPage({ params }: { params: Promise<{ slug: str
           <p style={{color: "#888", fontSize: "0.875rem", marginBottom: "0.75rem"}}>Partage ce lien</p>
           <div style={{background: "#222", borderRadius: "8px", padding: "0.75rem", color: "#ccc", fontSize: "0.875rem"}}>{shareUrl}</div>
         </div>
-        <StagesSection tripId={trip.id} stages={stages || []} />
+        <div style={{marginBottom: "2rem"}}>
+          <StagesSection tripId={trip.id} stages={stages || []} />
+        </div>
+        <JoinSection tripId={trip.id} stages={stages || []} />
       </div>
     </main>
   )
