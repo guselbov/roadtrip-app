@@ -29,14 +29,11 @@ export default async function TripPage({ params }: { params: Promise<{ slug: str
       <style>{`
         .trip-container { max-width: 430px; margin: 0 auto; }
         .trip-hero { height: 280px; }
-        .trip-stats-grid { grid-template-columns: 1fr auto; }
-        .trip-cards-grid { grid-template-columns: 1fr 1fr; }
         @media (min-width: 768px) {
           .trip-container { max-width: 800px; }
           .trip-hero { height: 340px; }
-          .trip-stats-grid { grid-template-columns: 1fr 1fr 1fr; }
-          .trip-cards-grid { grid-template-columns: 1fr 1fr 1fr 1fr; }
           .trip-stages { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+          .trip-stats { grid-template-columns: 1fr 1fr 1fr !important; }
         }
       `}</style>
       <main style={{background: "#0e1409", minHeight: "100vh", color: "#e8e4d9"}}>
@@ -73,8 +70,8 @@ export default async function TripPage({ params }: { params: Promise<{ slug: str
           <div style={{padding: "20px 20px 100px"}}>
 
             {/* STATS */}
-            <div className="trip-stats-grid" style={{display: "grid", gap: "12px", marginBottom: "24px"}}>
-              <div style={{background: "#141a0e", borderRadius: "16px", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between"}}>
+            <div className="trip-stats" style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "24px"}}>
+              <div style={{background: "#141a0e", borderRadius: "16px", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gridColumn: "span 2"}}>
                 <div>
                   <div style={{fontSize: "28px", fontWeight: "700"}}>{totalKm || "—"}</div>
                   <div style={{fontSize: "12px", color: "#7a8a6a"}}>km au total</div>
@@ -164,17 +161,31 @@ export default async function TripPage({ params }: { params: Promise<{ slug: str
                         </div>
                       </div>
                       {names.length > 0 && (
-                        <div style={{display: "flex", gap: "0"}}>
-                          {names.slice(0, 4).map((name: string, idx: number) => (
-                            <div key={idx} style={{width: "28px", height: "28px", borderRadius: "50%", background: colors[idx % colors.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "700", border: "2px solid #141a0e", marginLeft: idx > 0 ? "-8px" : "0"}}>
-                              {name[0].toUpperCase()}
-                            </div>
-                          ))}
-                          {names.length > 4 && (
-                            <div style={{width: "28px", height: "28px", borderRadius: "50%", background: "#2d4a1e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "700", border: "2px solid #141a0e", marginLeft: "-8px"}}>
-                              +{names.length - 4}
-                            </div>
-                          )}
+                        <div style={{display: "flex", alignItems: "center", justifyContent: "space-between"}}>
+                          <div style={{display: "flex"}}>
+                            {names.slice(0, 4).map((name: string, idx: number) => (
+                              <div key={idx} style={{width: "28px", height: "28px", borderRadius: "50%", background: colors[idx % colors.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "700", border: "2px solid #141a0e", marginLeft: idx > 0 ? "-8px" : "0"}}>
+                                {name[0].toUpperCase()}
+                              </div>
+                            ))}
+                            {names.length > 4 && (
+                              <div style={{width: "28px", height: "28px", borderRadius: "50%", background: "#2d4a1e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "700", border: "2px solid #141a0e", marginLeft: "-8px"}}>
+                                +{names.length - 4}
+                              </div>
+                            )}
+                          </div>
+                          <a href={"/stage/" + s.id}
+                            style={{background: "#2d4a1e", color: "#8fb840", borderRadius: "100px", padding: "6px 14px", fontSize: "12px", fontWeight: "700", textDecoration: "none", display: "flex", alignItems: "center", gap: "4px"}}>
+                            Voir l étape →
+                          </a>
+                        </div>
+                      )}
+                      {names.length === 0 && (
+                        <div style={{textAlign: "right"}}>
+                          <a href={"/stage/" + s.id}
+                            style={{background: "#141a0e", color: "#4a5a3a", borderRadius: "100px", padding: "6px 14px", fontSize: "12px", fontWeight: "600", textDecoration: "none", border: "1px solid #1a2212"}}>
+                            Voir l étape →
+                          </a>
                         </div>
                       )}
                     </div>
