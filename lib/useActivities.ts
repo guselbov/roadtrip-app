@@ -25,7 +25,8 @@ export function useActivities(tripId: string, meId: string) {
         .from("activities")
         .select("*, profiles:author_id(id, display_name)")
         .eq("trip_id", tripId)
-        .order("created_at", { ascending: false }),
+        .order("starts_on", { ascending: true, nullsFirst: false })
+        .order("starts_at", { ascending: true, nullsFirst: false }),
       supabase.from("activity_votes").select("activity_id, user_id"),
     ])
     setActivities((a.data as unknown as Activity[]) ?? [])
@@ -56,7 +57,16 @@ export function useActivities(tripId: string, meId: string) {
     [votes, meId]
   )
 
-  async function propose(input: { title: string; description?: string; stageId: string | null }) {
+  async function propose(input: {
+    title: string
+    place: string
+    startsOn: string
+    startsAt: string
+    description?: string
+    address?: string
+    url?: string
+    stageId: string | null
+  }) {
     const title = input.title.trim()
     if (!title) return false
     setError("")
@@ -65,7 +75,12 @@ export function useActivities(tripId: string, meId: string) {
       stage_id: input.stageId,
       author_id: meId,
       title,
+      place: input.place.trim() || null,
+      starts_on: input.startsOn || null,
+      starts_at: input.startsAt || null,
       description: input.description?.trim() || null,
+      address: input.address?.trim() || null,
+      url: input.url?.trim() || null,
       status: "proposed",
     })
     if (error) { setError(dbError(error)); return false }
@@ -96,9 +111,10 @@ export function useActivities(tripId: string, meId: string) {
   /** Réservé à l'organisateur — la policy et le trigger le vérifient aussi. */
   async function schedule(activityId: string, day: string | null) {
     setError("")
+    // Retenir, c'est fixer la date au programme du groupe.
     const patch = day
-      ? { scheduled_on: day, status: "scheduled" as const }
-      : { scheduled_on: null, status: "proposed" as const }
+      ? { starts_on: day, status: "scheduled" as const }
+      : { status: "proposed" as const }
     const { error } = await supabase.from("activities").update(patch).eq("id", activityId)
     if (error) { setError(dbError(error)); return false }
     await load()

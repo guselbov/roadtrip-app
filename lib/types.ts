@@ -117,7 +117,11 @@ export interface Activity {
   author_id: string
   title: string
   description: string | null
-  scheduled_on: string | null
+  place: string | null
+  address: string | null
+  url: string | null
+  starts_on: string | null
+  starts_at: string | null
   status: ActivityStatus
   created_at: string
   profiles?: Profile

@@ -346,7 +346,12 @@ export function StagePanel({
             onRemove={acts.remove}
             emptyText="Aucune idée pour cette étape. Lance la première, tes potes voteront."
           />
-          <ActivityForm onSubmit={(title, description) => acts.propose({ title, description, stageId })} />
+          <ActivityForm
+            defaultDay={stage?.date_start}
+            dayMin={stage?.date_start}
+            dayMax={stage?.date_end}
+            onSubmit={draft => acts.propose({ ...draft, stageId })}
+          />
           <p style={{ fontSize: "11px", color: C.dim, marginTop: "10px", lineHeight: 1.5 }}>
             👍 dit simplement « ça me tente ». {isOwner ? "À toi de retenir les idées et de les caler sur une journée." : "L'organisateur retient les idées et les cale sur une journée."}
           </p>

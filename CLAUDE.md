@@ -16,7 +16,7 @@ Application web permettant de créer et organiser des roadtrips collaboratifs. L
 - **URL** : https://rzmdjmuiburllzylrvxe.supabase.co
 - **Clés** : uniquement via `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (`.env.local`, et variables d'env Vercel). Ne jamais réintroduire de valeur en dur dans le code.
 - **Storage bucket** : trip-photos (lecture publique, écriture authentifiée)
-- **Migrations** : `0001_auth_rls.sql` (schéma + RLS), `0002_stages_overlap_and_owner.sql` (chevauchement, présence de l'organisateur, profils orphelins), `0003_activities.sql` (activités proposées et votées)
+- **Migrations** : `0001_auth_rls.sql` (schéma + RLS), `0002_stages_overlap_and_owner.sql` (chevauchement, présence de l'organisateur, profils orphelins), `0003_activities.sql` (activités proposées et votées), `0004_activity_details.sql` (lieu, créneau, adresse, lien)
 
 ## Schéma base de données
 ```sql
@@ -52,8 +52,12 @@ id, user_id, trip_id, stage_id, actor_id, type, payload, read_at, created_at
 
 -- activities : idées proposées par le groupe, rattachées à une étape
 id, trip_id, stage_id, author_id, title, description,
-scheduled_on, status (proposed|scheduled|rejected), created_at
--- seul l'organisateur peut renseigner scheduled_on/status : trigger guard_activity_update
+place, address, url, starts_on, starts_at,
+status (proposed|scheduled|rejected), created_at
+-- l'auteur fixe le créneau et le lieu ; seul l'organisateur change `status`
+-- et ne peut plus être modifiée par son auteur une fois retenue
+-- (trigger guard_activity_update)
+-- `url` est contrainte à http(s) : un `javascript:` deviendrait cliquable
 
 -- activity_votes : un pouce par personne et par activité
 activity_id, user_id, created_at  -- clé primaire composée
@@ -127,6 +131,7 @@ app/
 - Vert principal : #2d4a1e · Accent : #8fb840
 - Texte : #e8e4d9 · Muet : #7a8a6a · Estompé : #4a5a3a
 - Mobile-first, bordures arrondies, pas de Tailwind. Tokens dans `lib/ui.ts`.
+- Les styles sont écrits en ligne : impossible d'y mettre `:hover`. Les effets de survol vivent donc dans `globals.css`, en global (`filter: brightness`, qui ne dépend pas de la couleur) plus la classe `.hoverable` sur les cartes cliquables.
 - Les `<input>` font 16px minimum : en dessous, iOS zoome automatiquement au focus.
 
 ## Ce qui reste à faire

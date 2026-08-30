@@ -53,9 +53,11 @@ export function DayPanel({
     .filter((m): m is TripMember => m !== undefined && m.status === "approved")
   const uniqueHere = Array.from(new Map(here.map(m => [m.user_id, m])).values())
 
-  const scheduled = acts.activities.filter(a => a.scheduled_on === day)
+  const scheduled = acts.activities.filter(a => a.starts_on === day)
+  // Les idées pas encore retenues : celles de ce jour d'abord, puis le reste
+  // de l'étape, les mieux votées en tête.
   const proposals = acts.activities
-    .filter(a => a.status === "proposed" && (!stage || a.stage_id === stage.id))
+    .filter(a => a.status === "proposed" && a.starts_on !== day && (!stage || a.stage_id === stage.id))
     .sort((x, y) => (acts.voteCount.get(y.id) ?? 0) - (acts.voteCount.get(x.id) ?? 0))
 
   // Majuscule sur la première lettre seulement : « dimanche 12 juillet »,
@@ -160,9 +162,10 @@ export function DayPanel({
             emptyText="Aucune idée en attente. Propose la première."
           />
           <ActivityForm
-            onSubmit={(title, description) =>
-              acts.propose({ title, description, stageId: stage?.id ?? null })
-            }
+            defaultDay={day}
+            dayMin={stage?.date_start}
+            dayMax={stage?.date_end}
+            onSubmit={draft => acts.propose({ ...draft, stageId: stage?.id ?? null })}
           />
           {!isOwner && (
             <p style={{ fontSize: "11px", color: C.dim, marginTop: "10px", lineHeight: 1.5 }}>

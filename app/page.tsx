@@ -93,6 +93,7 @@ export default async function Home() {
             return (
               <Link
                 key={m.id}
+                className="hoverable"
                 href={isOwner ? "/dashboard/" + trip.slug : "/trip/" + trip.slug}
                 style={{ ...card, textDecoration: "none", color: C.text, display: "block", position: "relative" }}
               >

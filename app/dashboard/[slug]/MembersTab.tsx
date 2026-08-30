@@ -47,7 +47,7 @@ export function MembersTab({
     const parts = partsOf(m.id)
     const name = m.profiles?.display_name ?? "—"
     return (
-      <div style={{ ...card, marginBottom: "10px" }}>
+      <div className="hoverable" style={{ ...card, marginBottom: "10px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
           <span style={avatarStyle(m.user_id, 36)}>
             {name.charAt(0).toUpperCase()}

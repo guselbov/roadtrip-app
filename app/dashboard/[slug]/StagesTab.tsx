@@ -255,6 +255,7 @@ export function StagesTab({
         return (
           <div
             key={s.id}
+            className={isEditing ? "" : "hoverable"}
             style={{
               ...card,
               marginBottom: "10px",

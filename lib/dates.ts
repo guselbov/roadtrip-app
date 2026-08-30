@@ -92,3 +92,16 @@ export function stageSpan(start: string, end: string): [string, string] {
 export function spansOverlap(a: [string, string], b: [string, string]) {
   return a[0] < b[1] && b[0] < a[1]
 }
+
+/** "14:30:00" → "14h30". Postgres renvoie l'heure avec les secondes. */
+export function formatTime(t: string | null) {
+  if (!t) return ""
+  const [h, m] = t.split(":")
+  return `${h}h${m}`
+}
+
+/** "2026-07-12" → "dim. 12 juil." */
+export function formatDay(d: string | null) {
+  if (!d) return ""
+  return toDate(d).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })
+}

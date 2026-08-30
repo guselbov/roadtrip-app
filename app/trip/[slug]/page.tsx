@@ -294,7 +294,7 @@ export default async function TripPage({ params }: { params: Promise<{ slug: str
             )
 
             return isApproved ? (
-              <Link key={s.id} href={"/stage/" + s.id} style={{ ...card, textDecoration: "none", color: C.text, display: "block" }}>
+              <Link key={s.id} className="hoverable" href={"/stage/" + s.id} style={{ ...card, textDecoration: "none", color: C.text, display: "block" }}>
                 {inner}
               </Link>
             ) : (

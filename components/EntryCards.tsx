@@ -39,7 +39,7 @@ export function EntryCards() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-      <Link href="/creer" style={{ ...cardBase, background: C.accent, color: C.bg }}>
+      <Link href="/creer" className="hoverable" style={{ ...cardBase, background: C.accent, color: C.bg }}>
         <span style={{ ...iconBox, background: "rgba(0,0,0,0.15)" }}>🗺️</span>
         <span style={{ flex: 1 }}>
           <span style={{ display: "block", fontSize: "17px", fontWeight: 800, marginBottom: "2px" }}>
@@ -52,7 +52,7 @@ export function EntryCards() {
         <span style={{ fontSize: "20px", opacity: 0.6 }}>→</span>
       </Link>
 
-      <div style={{ background: C.card, borderRadius: "20px", border: `1px solid ${openCode ? C.greenLight : "transparent"}` }}>
+      <div className={openCode ? "" : "hoverable"} style={{ background: C.card, borderRadius: "20px", border: `1px solid ${openCode ? C.greenLight : "transparent"}` }}>
         <button
           onClick={() => setOpenCode(o => !o)}
           aria-expanded={openCode}
