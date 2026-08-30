@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { dbError } from "@/lib/errors"
 import { C, btnPrimary, input, label } from "@/lib/ui"
 
 // Alphabet sans I/O/0/1 : un code lu au téléphone ne doit jamais être ambigu.
@@ -54,7 +55,7 @@ export function CreateTripForm({ userId }: { userId: string }) {
       }
       if (error && error.code !== "23505") {
         setLoading(false)
-        setError(error.message)
+        setError(dbError(error))
         return
       }
     }

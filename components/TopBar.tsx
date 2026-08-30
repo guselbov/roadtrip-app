@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { NotificationBell, type NotifRow } from "./NotificationBell"
+import { SessionSync } from "./SessionSync"
 import { createClient } from "@/lib/supabase/server"
 import { authUrl } from "@/lib/auth"
 import { C, avatarColor } from "@/lib/ui"
@@ -19,6 +20,7 @@ export async function TopBar({ profile, next = "/" }: { profile: Profile | null;
 
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", gap: "10px" }}>
+      <SessionSync userId={profile?.id ?? null} />
       <Link href="/" style={{ textDecoration: "none", color: C.text, fontWeight: 800, fontSize: "17px", letterSpacing: "-0.3px", display: "flex", alignItems: "center", gap: "8px" }}>
         <span style={{ fontSize: "20px" }}>🌊</span> RoadTrip
       </Link>

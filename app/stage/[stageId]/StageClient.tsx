@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatRange } from "@/lib/dates"
+import { dbError } from "@/lib/errors"
 import { C, avatarColor, card, input } from "@/lib/ui"
 import type { Message, Photo, Profile, Stage } from "@/lib/types"
 
@@ -96,7 +97,7 @@ export function StageClient({
       .select()
       .single()
     setSending(false)
-    if (error) { setError(error.message); return }
+    if (error) { setError(dbError(error)); return }
     setText("")
     if (data) setMessages(prev => (prev.some(m => m.id === data.id) ? prev : [...prev, data as Message]))
   }
@@ -118,7 +119,7 @@ export function StageClient({
       cacheControl: "3600",
       upsert: false,
     })
-    if (upErr) { setUploading(false); setError(upErr.message); return }
+    if (upErr) { setUploading(false); setError(dbError(upErr)); return }
 
     const { data: pub } = supabase.storage.from("trip-photos").getPublicUrl(path)
     const { data, error: insErr } = await supabase
@@ -128,7 +129,7 @@ export function StageClient({
       .single()
 
     setUploading(false)
-    if (insErr) { setError(insErr.message); return }
+    if (insErr) { setError(dbError(insErr)); return }
     if (data) setPhotos(prev => (prev.some(p => p.id === data.id) ? prev : [data as Photo, ...prev]))
     if (fileRef.current) fileRef.current.value = ""
   }

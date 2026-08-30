@@ -3,6 +3,7 @@ import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { computeOverlaps, dayCount, formatRange } from "@/lib/dates"
+import { dbError } from "@/lib/errors"
 import { C, btnPrimary, input, label } from "@/lib/ui"
 import type { Stage } from "@/lib/types"
 
@@ -79,14 +80,14 @@ export function JoinFlow({
         .from("trip_members")
         .update({ date_start: from, date_end: to })
         .eq("id", memberId!)
-      if (error) { setLoading(false); setError(error.message); return }
+      if (error) { setLoading(false); setError(dbError(error)); return }
 
       // On remplace le jeu d'étapes : plus simple et plus sûr qu'un diff.
       const { error: delError } = await supabase
         .from("participations")
         .delete()
         .eq("member_id", memberId!)
-      if (delError) { setLoading(false); setError(delError.message); return }
+      if (delError) { setLoading(false); setError(dbError(delError)); return }
     } else {
       const { data: member, error: memberError } = await supabase
         .from("trip_members")
@@ -107,7 +108,7 @@ export function JoinFlow({
         setError(
           memberError?.code === "23505"
             ? "Tu as déjà une demande sur ce trip."
-            : memberError?.message ?? "Erreur inconnue."
+            : dbError(memberError)
         )
         return
       }
@@ -123,7 +124,7 @@ export function JoinFlow({
           date_end: o.end,
         }))
       )
-      if (partError) { setLoading(false); setError(partError.message); return }
+      if (partError) { setLoading(false); setError(dbError(partError)); return }
     }
 
     setLoading(false)

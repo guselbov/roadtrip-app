@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatRange } from "@/lib/dates"
+import { dbError } from "@/lib/errors"
 import { C, btnPrimary, card, input, label } from "@/lib/ui"
 import type { Participation, Stage } from "@/lib/types"
 
@@ -83,7 +84,7 @@ export function StagesTab({
       .single()
 
     setSaving(false)
-    if (error || !data) { setError(error?.message ?? "Erreur"); return }
+    if (error || !data) { setError(dbError(error)); return }
 
     onChange([...stages, data as Stage])
     setForm(EMPTY)
