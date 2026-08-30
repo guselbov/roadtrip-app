@@ -1,0 +1,136 @@
+"use client"
+import { daysBetween, toDate } from "@/lib/dates"
+import { C, avatarColor } from "@/lib/ui"
+import type { Participation, Stage, TripMember } from "@/lib/types"
+
+const STAGE_COLORS = ["#8fb840", "#c07040", "#5a9bd4", "#b06fb0", "#d0a850", "#4fb0a0"]
+
+/** Frise jour par jour : qui est là, et où. La vue que l'organisateur n'avait pas. */
+export function PlanningTab({
+  stages,
+  members,
+  participations,
+  tripStart,
+  tripEnd,
+}: {
+  stages: Stage[]
+  members: TripMember[]
+  participations: Participation[]
+  tripStart: string | null
+  tripEnd: string | null
+}) {
+  const approved = members.filter(m => m.status === "approved")
+
+  const bounds = [
+    ...stages.flatMap(s => [s.date_start, s.date_end]),
+    ...participations.flatMap(p => [p.date_start, p.date_end]),
+    tripStart,
+    tripEnd,
+  ].filter(Boolean) as string[]
+
+  if (bounds.length === 0 || approved.length === 0) {
+    return (
+      <div style={{ background: C.card, borderRadius: "16px", padding: "28px 20px", textAlign: "center", color: C.muted, fontSize: "14px", lineHeight: 1.5 }}>
+        {approved.length === 0
+          ? "Valide au moins un pote pour voir le planning se remplir."
+          : "Ajoute des dates à tes étapes pour construire le planning."}
+      </div>
+    )
+  }
+
+  const start = bounds.reduce((a, b) => (a < b ? a : b))
+  const end = bounds.reduce((a, b) => (a > b ? a : b))
+  const days = daysBetween(start, end)
+
+  const colorOf = new Map(stages.map((s, i) => [s.id, STAGE_COLORS[i % STAGE_COLORS.length]]))
+  const byMember = new Map<string, Participation[]>()
+  for (const p of participations) {
+    const list = byMember.get(p.member_id) ?? []
+    list.push(p)
+    byMember.set(p.member_id, list)
+  }
+
+  const CELL = 30
+  const NAME_W = 96
+
+  return (
+    <div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "14px" }}>
+        {stages.map(s => (
+          <span key={s.id} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: C.muted }}>
+            <span style={{ width: "10px", height: "10px", borderRadius: "3px", background: colorOf.get(s.id) }} />
+            {s.name}
+          </span>
+        ))}
+      </div>
+
+      <div style={{ overflowX: "auto", background: C.card, borderRadius: "16px", padding: "14px" }}>
+        <div style={{ minWidth: NAME_W + days.length * CELL + "px" }}>
+          {/* En-tête : les jours */}
+          <div style={{ display: "flex", marginBottom: "6px" }}>
+            <div style={{ width: NAME_W + "px", flexShrink: 0 }} />
+            {days.map(d => {
+              const date = toDate(d)
+              const weekend = date.getDay() === 0 || date.getDay() === 6
+              return (
+                <div key={d} style={{ width: CELL + "px", flexShrink: 0, textAlign: "center", fontSize: "10px", color: weekend ? C.accent : C.dim, lineHeight: 1.2 }}>
+                  <div>{date.toLocaleDateString("fr-FR", { weekday: "narrow" })}</div>
+                  <div style={{ fontWeight: 700 }}>{date.getDate()}</div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Une ligne par pote validé */}
+          {approved.map(m => {
+            const parts = byMember.get(m.id) ?? []
+            return (
+              <div key={m.id} style={{ display: "flex", alignItems: "center", marginBottom: "4px" }}>
+                <div style={{ width: NAME_W + "px", flexShrink: 0, display: "flex", alignItems: "center", gap: "6px", paddingRight: "8px" }}>
+                  <span style={{ width: "20px", height: "20px", borderRadius: "50%", background: avatarColor(m.user_id), fontSize: "10px", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    {(m.profiles?.display_name ?? "?").charAt(0).toUpperCase()}
+                  </span>
+                  <span style={{ fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {m.profiles?.display_name ?? "—"}
+                  </span>
+                </div>
+
+                {days.map(d => {
+                  const here = parts.find(p => d >= p.date_start && d <= p.date_end)
+                  return (
+                    <div key={d} style={{ width: CELL + "px", flexShrink: 0, padding: "0 1px" }}>
+                      <div
+                        title={here ? stages.find(s => s.id === here.stage_id)?.name : undefined}
+                        style={{
+                          height: "22px",
+                          borderRadius: "5px",
+                          background: here ? colorOf.get(here.stage_id) : C.bg,
+                          opacity: here ? 0.9 : 1,
+                        }}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+
+          {/* Densité : combien de personnes chaque jour */}
+          <div style={{ display: "flex", alignItems: "center", marginTop: "10px", borderTop: `1px solid ${C.bg}`, paddingTop: "8px" }}>
+            <div style={{ width: NAME_W + "px", flexShrink: 0, fontSize: "11px", color: C.muted }}>Au total</div>
+            {days.map(d => {
+              const n = approved.filter(m =>
+                (byMember.get(m.id) ?? []).some(p => d >= p.date_start && d <= p.date_end)
+              ).length
+              return (
+                <div key={d} style={{ width: CELL + "px", flexShrink: 0, textAlign: "center", fontSize: "11px", fontWeight: 700, color: n === 0 ? C.dim : C.text }}>
+                  {n || "·"}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

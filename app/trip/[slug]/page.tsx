@@ -1,208 +1,299 @@
-import { supabase } from "@/lib/supabase"
+import Link from "next/link"
 import { notFound } from "next/navigation"
-import { JoinSection } from "./JoinSection"
-import { ShareButton } from "./ShareButton"
-import { AdminSwitch } from "./AdminSwitch"
+import { createClient } from "@/lib/supabase/server"
+import { getCurrentProfile, authUrl } from "@/lib/auth"
+import { TopBar } from "@/components/TopBar"
+import { ShareButton } from "@/components/ShareButton"
+import { TripMap } from "@/components/TripMap"
+import { JoinFlow } from "@/components/JoinFlow"
+import { formatLongRange, formatRange } from "@/lib/dates"
+import { C, avatarColor, card, container, page } from "@/lib/ui"
+import type { MemberStatus, PublicTrip, Stage } from "@/lib/types"
+
+export const dynamic = "force-dynamic"
+
+function totalKm(stages: { lat: number | null; lng: number | null }[]) {
+  let km = 0
+  for (let i = 1; i < stages.length; i++) {
+    const a = stages[i - 1], b = stages[i]
+    if (a.lat == null || a.lng == null || b.lat == null || b.lng == null) continue
+    const R = 6371
+    const dLat = ((b.lat - a.lat) * Math.PI) / 180
+    const dLon = ((b.lng - a.lng) * Math.PI) / 180
+    const h =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2
+    km += R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
+  }
+  return Math.round(km)
+}
 
 export default async function TripPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const { data: trip } = await supabase.from("roadtrips").select("*").eq("slug", slug).single()
-  if (!trip) return notFound()
-  const { data: stages } = await supabase.from("stages").select("*").eq("roadtrip_id", trip.id).order("order_index")
-  const { data: participations } = await supabase.from("participations").select("*, participants(name), stages(id)").eq("status", "approved")
+  const supabase = await createClient()
+  const profile = await getCurrentProfile()
 
-  const totalKm = stages && stages.length > 1 ? Math.round(stages.reduce((acc, s, i) => {
-    if (i === 0) return 0
-    const prev = stages[i-1]
-    const R = 6371
-    const dLat = (s.lat - prev.lat) * Math.PI / 180
-    const dLon = (s.lng - prev.lng) * Math.PI / 180
-    const a = Math.sin(dLat/2)**2 + Math.cos(prev.lat * Math.PI/180) * Math.cos(s.lat * Math.PI/180) * Math.sin(dLon/2)**2
-    return acc + R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-  }, 0)) : 0
+  const { data: raw } = await supabase.rpc("get_public_trip", { p_slug: slug })
+  if (!raw) notFound()
+  const trip = raw as PublicTrip
+  const stages = trip.stages ?? []
 
-  const uniqueParticipants = participations ? [...new Set(participations.map((p: any) => p.participants?.name).filter(Boolean))] : []
-  const colors = ["#2d4a1e","#5c3d2e","#3d6429","#7a5240","#1a2212"]
+  type Membership = { id: string; role: string; status: MemberStatus; date_start: string | null; date_end: string | null }
+  let membership: Membership | null = null
+  let myStageIds: string[] = []
+  let crew: { user_id: string; profiles: { display_name: string } | null }[] = []
+
+  if (profile) {
+    const { data: m } = await supabase
+      .from("trip_members")
+      .select("id, role, status, date_start, date_end")
+      .eq("trip_id", trip.id)
+      .eq("user_id", profile.id)
+      .maybeSingle()
+    membership = (m as Membership | null) ?? null
+
+    if (membership) {
+      const { data: parts } = await supabase
+        .from("participations")
+        .select("stage_id")
+        .eq("member_id", membership.id)
+      myStageIds = (parts ?? []).map(p => p.stage_id)
+    }
+    if (membership?.status === "approved") {
+      const { data: c } = await supabase
+        .from("trip_members")
+        .select("user_id, profiles(display_name)")
+        .eq("trip_id", trip.id)
+        .eq("status", "approved")
+      crew = (c as unknown as typeof crew) ?? []
+    }
+  }
+
+  const isOwner = membership?.role === "owner"
+  const isApproved = membership?.status === "approved"
+  const km = totalKm(stages)
+  const tripUrl = "/trip/" + slug
 
   return (
-    <>
-      <style>{`
-        .trip-container { max-width: 430px; margin: 0 auto; }
-        .trip-hero { height: 280px; }
-        @media (min-width: 768px) {
-          .trip-container { max-width: 800px; }
-          .trip-hero { height: 340px; }
-          .trip-stages { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-          .trip-stats { grid-template-columns: 1fr 1fr 1fr !important; }
-        }
-      `}</style>
-      <main style={{background: "#0e1409", minHeight: "100vh", color: "#e8e4d9"}}>
-        <div className="trip-container">
+    <main style={page}>
+      <TopBar profile={profile} next={tripUrl} />
 
-          {/* TOPBAR */}
-          <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px"}}>
-            <div style={{background: "#2d4a1e", borderRadius: "20px", padding: "6px 14px", fontSize: "12px", fontWeight: "600", letterSpacing: "0.5px"}}>
-              ROADTRIP · {new Date(trip.date_start || Date.now()).getFullYear()}
-            </div>
-            <div style={{display: "flex", gap: "8px", alignItems: "center"}}>
-              <AdminSwitch slug={slug} />
-              <ShareButton url={"https://roadtrip-app-vercel.vercel.app/trip/" + slug} title={trip.title} />
-            </div>
+      <div style={{ ...container, paddingBottom: "60px" }}>
+        {/* HERO */}
+        <div style={{ marginBottom: "24px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "14px" }}>
+            <span style={{ background: C.green, borderRadius: "20px", padding: "5px 12px", fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", color: C.accent }}>
+              {trip.date_start ? new Date(trip.date_start).getFullYear() : "ROADTRIP"}
+            </span>
+            <ShareButton slug={slug} title={trip.title} code="" />
           </div>
 
-          {/* HERO */}
-          <div className="trip-hero" style={{position: "relative", background: "linear-gradient(180deg, #1a2212 0%, #0e1409 100%)", overflow: "hidden", padding: "0 24px 24px", display: "flex", flexDirection: "column", justifyContent: "flex-end"}}>
-            <div style={{position: "absolute", top: "20px", right: "60px", width: "100px", height: "100px", borderRadius: "50%", background: "#3d6429", opacity: 0.5}}></div>
-            <div style={{position: "absolute", bottom: "60px", left: 0, right: 0, height: "80px", background: "linear-gradient(to right, #1a2212 0%, #2d4a1e 50%, #1a2212 100%)", opacity: 0.3, borderRadius: "50% 50% 0 0"}}></div>
-            <div style={{position: "relative"}}>
-              <div style={{fontSize: "11px", color: "#7a8a6a", letterSpacing: "1px", marginBottom: "4px"}}>
-                {stages && stages[0] ? `${stages[0].lat?.toFixed(2)}N · ${Math.abs(Number(stages[0].lng?.toFixed(2)))}W` : ""}
-              </div>
-              <h1 style={{fontSize: "clamp(32px, 5vw, 48px)", fontWeight: "700", lineHeight: 1}}>{trip.title}</h1>
-              <div style={{fontSize: "13px", color: "#7a8a6a", marginTop: "6px"}}>
-                {trip.date_start && trip.date_end
-                  ? `${new Date(trip.date_start).toLocaleDateString("fr-FR", {day:"numeric", month:"long"})} → ${new Date(trip.date_end).toLocaleDateString("fr-FR", {day:"numeric", month:"long", year:"numeric"})}`
-                  : ""} · {trip.creator_email?.split("@")[0]}
-              </div>
-            </div>
-          </div>
-
-          <div style={{padding: "20px 20px 100px"}}>
-
-            {/* STATS */}
-            <div className="trip-stats" style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "24px"}}>
-              <div style={{background: "#141a0e", borderRadius: "16px", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gridColumn: "span 2"}}>
-                <div>
-                  <div style={{fontSize: "28px", fontWeight: "700"}}>{totalKm || "—"}</div>
-                  <div style={{fontSize: "12px", color: "#7a8a6a"}}>km au total</div>
-                </div>
-                <div style={{width: "36px", height: "36px", borderRadius: "50%", background: "#2d4a1e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px"}}>↗</div>
-              </div>
-              <div style={{background: "#141a0e", borderRadius: "16px", padding: "16px"}}>
-                <div style={{fontSize: "20px", marginBottom: "4px"}}>📍</div>
-                <div style={{fontSize: "24px", fontWeight: "700"}}>{stages?.length || 0}</div>
-                <div style={{fontSize: "12px", color: "#7a8a6a"}}>étapes</div>
-              </div>
-              <div style={{background: "#141a0e", borderRadius: "16px", padding: "16px"}}>
-                <div style={{fontSize: "20px", marginBottom: "4px"}}>👥</div>
-                <div style={{fontSize: "24px", fontWeight: "700"}}>{uniqueParticipants.length}</div>
-                <div style={{fontSize: "12px", color: "#7a8a6a"}}>participants</div>
-              </div>
-            </div>
-
-            {/* DESCRIPTION */}
-            {trip.description && (
-              <p style={{color: "#a0b080", fontSize: "15px", lineHeight: "1.6", marginBottom: "24px"}}>{trip.description}</p>
-            )}
-
-            {/* CTA */}
-            <JoinSection tripId={trip.id} stages={stages || []} />
-
-            {/* ITINERAIRE */}
-            {stages && stages.length > 0 && (
-              <div style={{marginTop: "32px"}}>
-                <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px"}}>
-                  <div style={{fontSize: "11px", color: "#7a8a6a", letterSpacing: "1px"}}>RELEVÉ D ITINÉRAIRE</div>
-                  <div style={{fontSize: "11px", color: "#7a8a6a"}}>{stages.length} ÉTAPES · {totalKm} KM</div>
-                </div>
-                <div style={{background: "#f5f0e8", borderRadius: "16px", padding: "20px", position: "relative", overflow: "hidden", height: "160px"}}>
-                  <svg width="100%" height="100%" viewBox="0 0 300 120" preserveAspectRatio="none">
-                    <path d={"M 0 80 " + stages.map((s, i) => `Q ${(i+0.5) * (300/stages.length)} ${40 + Math.sin(i) * 30} ${(i+1) * (300/stages.length)} ${50 + Math.cos(i*1.5) * 25}`).join(" ")} fill="none" stroke="#2d4a1e" strokeWidth="2" strokeDasharray="6 4"/>
-                    {stages.map((s, i) => (
-                      <g key={s.id}>
-                        <circle cx={(i+0.5) * (300/stages.length)} cy={50 + Math.cos(i*1.5) * 25} r="6" fill="#2d4a1e"/>
-                        <text x={(i+0.5) * (300/stages.length)} y={50 + Math.cos(i*1.5) * 25 - 12} textAnchor="middle" fontSize="8" fill="#2d4a1e" fontWeight="bold">{i+1}</text>
-                      </g>
-                    ))}
-                  </svg>
-                  <div style={{position: "absolute", bottom: "12px", left: "12px", display: "flex", gap: "8px", flexWrap: "wrap"}}>
-                    {stages.map((s) => (
-                      <div key={s.id} style={{background: "rgba(45,74,30,0.15)", border: "1px solid #2d4a1e", borderRadius: "20px", padding: "4px 10px", fontSize: "10px", color: "#2d4a1e", fontWeight: "600", whiteSpace: "nowrap"}}>
-                        {s.name}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* PROGRAMME */}
-            <div style={{marginTop: "32px"}}>
-              <h2 style={{fontSize: "20px", fontWeight: "700", marginBottom: "16px"}}>Le programme</h2>
-              <div className="trip-stages">
-                {stages?.map((s, i) => {
-                  const stageP = participations?.filter((p: any) => p.stages?.id === s.id) || []
-                  const names = stageP.map((p: any) => p.participants?.name).filter(Boolean)
-                  return (
-                    <div key={s.id} style={{background: "#141a0e", borderRadius: "16px", padding: "16px", marginBottom: "12px"}}>
-                      <div style={{display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "8px"}}>
-                        <div style={{display: "flex", alignItems: "center", gap: "8px"}}>
-                          <span style={{fontSize: "14px"}}>📍</span>
-                          <span style={{fontWeight: "700", fontSize: "17px"}}>{s.name}</span>
-                        </div>
-                        {s.date_start && s.date_end && (
-                          <div style={{background: "#2d4a1e", borderRadius: "20px", padding: "3px 10px", fontSize: "11px", fontWeight: "600", color: "#8fb840"}}>
-                            J{i*2+1}-{i*2+3}
-                          </div>
-                        )}
-                      </div>
-                      {s.description && <p style={{fontSize: "13px", color: "#7a8a6a", marginBottom: "10px"}}>{s.description}</p>}
-                      <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "10px"}}>
-                        <div style={{background: "#0e1409", borderRadius: "10px", padding: "10px"}}>
-                          <div style={{fontSize: "10px", color: "#7a8a6a", marginBottom: "2px"}}>DATES</div>
-                          <div style={{fontSize: "13px", fontWeight: "600"}}>
-                            {s.date_start ? new Date(s.date_start).toLocaleDateString("fr-FR", {day:"numeric", month:"short"}) : "—"}
-                            {s.date_end ? " – " + new Date(s.date_end).toLocaleDateString("fr-FR", {day:"numeric", month:"short"}) : ""}
-                          </div>
-                        </div>
-                        <div style={{background: "#0e1409", borderRadius: "10px", padding: "10px"}}>
-                          <div style={{fontSize: "10px", color: "#7a8a6a", marginBottom: "2px"}}>GROUPE</div>
-                          <div style={{fontSize: "13px", fontWeight: "600"}}>{names.length} pers.</div>
-                        </div>
-                      </div>
-                      {names.length > 0 && (
-                        <div style={{display: "flex", alignItems: "center", justifyContent: "space-between"}}>
-                          <div style={{display: "flex"}}>
-                            {names.slice(0, 4).map((name: string, idx: number) => (
-                              <div key={idx} style={{width: "28px", height: "28px", borderRadius: "50%", background: colors[idx % colors.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "700", border: "2px solid #141a0e", marginLeft: idx > 0 ? "-8px" : "0"}}>
-                                {name[0].toUpperCase()}
-                              </div>
-                            ))}
-                            {names.length > 4 && (
-                              <div style={{width: "28px", height: "28px", borderRadius: "50%", background: "#2d4a1e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "700", border: "2px solid #141a0e", marginLeft: "-8px"}}>
-                                +{names.length - 4}
-                              </div>
-                            )}
-                          </div>
-                          <a href={"/stage/" + s.id}
-                            style={{background: "#2d4a1e", color: "#8fb840", borderRadius: "100px", padding: "6px 14px", fontSize: "12px", fontWeight: "700", textDecoration: "none", display: "flex", alignItems: "center", gap: "4px"}}>
-                            Voir l étape →
-                          </a>
-                        </div>
-                      )}
-                      {names.length === 0 && (
-                        <div style={{textAlign: "right"}}>
-                          <a href={"/stage/" + s.id}
-                            style={{background: "#141a0e", color: "#4a5a3a", borderRadius: "100px", padding: "6px 14px", fontSize: "12px", fontWeight: "600", textDecoration: "none", border: "1px solid #1a2212"}}>
-                            Voir l étape →
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* CTA BAS */}
-            <div style={{marginTop: "32px", textAlign: "center", padding: "24px", background: "#141a0e", borderRadius: "20px"}}>
-              <p style={{color: "#7a8a6a", fontSize: "14px", marginBottom: "16px"}}>Prêt·e pour l aventure ?</p>
-              <JoinSection tripId={trip.id} stages={stages || []} ctaOnly />
-            </div>
-
-          </div>
+          <h1 style={{ fontSize: "clamp(30px, 8vw, 42px)", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-1px" }}>
+            {trip.title}
+          </h1>
+          <p style={{ color: C.muted, fontSize: "14px", marginTop: "8px" }}>
+            {formatLongRange(trip.date_start, trip.date_end) || "Dates à définir"}
+            {trip.owner_name ? ` · organisé par ${trip.owner_name}` : ""}
+          </p>
+          {trip.description && (
+            <p style={{ color: "#a0b080", fontSize: "15px", lineHeight: 1.6, marginTop: "14px" }}>{trip.description}</p>
+          )}
         </div>
-      </main>
-    </>
+
+        {/* CARTE */}
+        {stages.some(s => s.lat != null) && (
+          <div style={{ marginBottom: "20px" }}>
+            <TripMap points={stages.map(s => ({ id: s.id, name: s.name, lat: s.lat, lng: s.lng }))} />
+          </div>
+        )}
+
+        {/* STATS */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "24px" }}>
+          {[
+            { icon: "📍", value: stages.length, label: "étapes" },
+            { icon: "👥", value: trip.member_count, label: "confirmés" },
+            { icon: "🛣️", value: km || "—", label: "km" },
+          ].map(s => (
+            <div key={s.label} style={{ ...card, padding: "14px" }}>
+              <div style={{ fontSize: "17px", marginBottom: "4px" }}>{s.icon}</div>
+              <div style={{ fontSize: "22px", fontWeight: 800 }}>{s.value}</div>
+              <div style={{ fontSize: "12px", color: C.muted }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA SELON LE STATUT */}
+        <div style={{ marginBottom: "32px" }}>
+          {isOwner && (
+            <>
+              <Link href={"/dashboard/" + slug} style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", textDecoration: "none", color: C.text, background: C.green, marginBottom: "10px" }}>
+                <span style={{ fontWeight: 700 }}>C&apos;est ton trip — gérer</span>
+                <span style={{ color: C.accent }}>→</span>
+              </Link>
+              {profile && membership && (
+                <JoinFlow
+                  tripId={trip.id}
+                  userId={profile.id}
+                  stages={stages as Stage[]}
+                  tripStart={trip.date_start}
+                  tripEnd={trip.date_end}
+                  memberId={membership.id}
+                  initialFrom={membership.date_start}
+                  initialTo={membership.date_end}
+                  initialStageIds={myStageIds}
+                  trigger={
+                    <button style={{ ...card, width: "100%", border: `1px solid ${C.green}`, color: C.text, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: "inherit", fontSize: "15px" }}>
+                      <span>
+                        {myStageIds.length > 0
+                          ? `Tu es sur ${myStageIds.length} étape${myStageIds.length > 1 ? "s" : ""}`
+                          : "Dis sur quelles étapes tu seras"}
+                      </span>
+                      <span style={{ color: C.accent, fontSize: "13px" }}>Mes dates →</span>
+                    </button>
+                  }
+                />
+              )}
+            </>
+          )}
+
+          {!isOwner && isApproved && profile && membership && (
+            <>
+              <div style={{ ...card, background: C.green, marginBottom: "10px" }}>
+                <div style={{ fontWeight: 700, marginBottom: "4px" }}>Tu es dans le trip 🎉</div>
+                <div style={{ fontSize: "13px", color: "#c8d8a8" }}>
+                  {myStageIds.length > 0
+                    ? `${myStageIds.length} étape${myStageIds.length > 1 ? "s" : ""} confirmée${myStageIds.length > 1 ? "s" : ""} — ouvre-les pour la messagerie et les photos.`
+                    : "Aucune étape enregistrée pour le moment."}
+                </div>
+              </div>
+              <JoinFlow
+                tripId={trip.id}
+                userId={profile.id}
+                stages={stages as Stage[]}
+                tripStart={trip.date_start}
+                tripEnd={trip.date_end}
+                memberId={membership.id}
+                initialFrom={membership.date_start}
+                initialTo={membership.date_end}
+                initialStageIds={myStageIds}
+                trigger={
+                  <button style={{ ...card, width: "100%", border: `1px solid ${C.green}`, color: C.muted, cursor: "pointer", textAlign: "center", fontFamily: "inherit", fontSize: "14px" }}>
+                    Modifier mes dates
+                  </button>
+                }
+              />
+            </>
+          )}
+
+          {membership?.status === "pending" && (
+            <div style={{ ...card, border: `1px solid ${C.green}` }}>
+              <div style={{ fontWeight: 700, marginBottom: "4px" }}>Demande envoyée ⏳</div>
+              <div style={{ fontSize: "13px", color: C.muted }}>
+                {trip.owner_name ?? "L'organisateur"} doit valider. Tu seras prévenu ici même.
+              </div>
+            </div>
+          )}
+
+          {membership?.status === "rejected" && (
+            <div style={{ ...card, border: `1px solid ${C.warn}` }}>
+              <div style={{ fontWeight: 700, marginBottom: "4px" }}>Demande refusée</div>
+              <div style={{ fontSize: "13px", color: C.muted }}>Contacte l&apos;organisateur si c&apos;est une erreur.</div>
+            </div>
+          )}
+
+          {!membership && profile && (
+            <JoinFlow
+              tripId={trip.id}
+              userId={profile.id}
+              stages={stages as Stage[]}
+              tripStart={trip.date_start}
+              tripEnd={trip.date_end}
+            />
+          )}
+
+          {!profile && (
+            <Link
+              href={authUrl(tripUrl, "Rejoins " + trip.title)}
+              style={{ background: C.accent, color: C.bg, borderRadius: "100px", padding: "16px", display: "block", textAlign: "center", fontWeight: 700, fontSize: "16px", textDecoration: "none" }}
+            >
+              Je viens ! →
+            </Link>
+          )}
+        </div>
+
+        {/* ÉQUIPAGE */}
+        {isApproved && crew.length > 0 && (
+          <div style={{ marginBottom: "28px" }}>
+            <div style={{ fontSize: "11px", color: C.muted, letterSpacing: "1px", marginBottom: "10px" }}>L&apos;ÉQUIPAGE</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {crew.map(c => (
+                <span key={c.user_id} style={{ display: "flex", alignItems: "center", gap: "7px", background: C.card, borderRadius: "100px", padding: "5px 12px 5px 5px" }}>
+                  <span style={{ width: "24px", height: "24px", borderRadius: "50%", background: avatarColor(c.user_id), display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 800 }}>
+                    {(c.profiles?.display_name ?? "?").charAt(0).toUpperCase()}
+                  </span>
+                  <span style={{ fontSize: "13px" }}>{c.profiles?.display_name ?? "—"}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* PROGRAMME */}
+        <h2 style={{ fontSize: "20px", fontWeight: 800, marginBottom: "14px" }}>Le programme</h2>
+        {stages.length === 0 && (
+          <div style={{ ...card, color: C.muted, fontSize: "14px" }}>
+            Aucune étape pour l&apos;instant. {isOwner ? "Ajoute-les depuis ton dashboard." : "L'organisateur les ajoute bientôt."}
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {stages.map((s, i) => {
+            const mine = myStageIds.includes(s.id)
+            const inner = (
+              <>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "10px", marginBottom: "6px" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "9px" }}>
+                    <span style={{ width: "24px", height: "24px", borderRadius: "50%", background: C.green, color: C.accent, fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {i + 1}
+                    </span>
+                    <span style={{ fontWeight: 700, fontSize: "17px" }}>{s.name}</span>
+                  </span>
+                  {mine && (
+                    <span style={{ background: C.accent, color: C.bg, borderRadius: "20px", padding: "2px 9px", fontSize: "10px", fontWeight: 800, whiteSpace: "nowrap" }}>
+                      TU Y ES
+                    </span>
+                  )}
+                </div>
+                {s.description && (
+                  <p style={{ fontSize: "13px", color: C.muted, marginBottom: "8px" }}>{s.description}</p>
+                )}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "13px", color: C.muted }}>
+                  <span>{formatRange(s.date_start, s.date_end)}</span>
+                  <span>
+                    {s.people} pers.
+                    {isApproved && <span style={{ color: C.accent, marginLeft: "10px" }}>Ouvrir →</span>}
+                    {!isApproved && <span style={{ color: C.dim, marginLeft: "10px" }}>🔒</span>}
+                  </span>
+                </div>
+              </>
+            )
+
+            return isApproved ? (
+              <Link key={s.id} href={"/stage/" + s.id} style={{ ...card, textDecoration: "none", color: C.text, display: "block" }}>
+                {inner}
+              </Link>
+            ) : (
+              <div key={s.id} style={card}>{inner}</div>
+            )
+          })}
+        </div>
+
+        {!isApproved && stages.length > 0 && (
+          <p style={{ color: C.dim, fontSize: "12px", marginTop: "14px", textAlign: "center", lineHeight: 1.5 }}>
+            🔒 La messagerie et l&apos;album de chaque étape s&apos;ouvrent une fois ta place validée par l&apos;organisateur.
+          </p>
+        )}
+      </div>
+    </main>
   )
 }
