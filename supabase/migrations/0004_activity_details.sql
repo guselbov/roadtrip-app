@@ -19,10 +19,23 @@ alter table public.activities
   add column if not exists starts_on date,
   add column if not exists starts_at time;
 
--- Reprise des activités déjà programmées, s'il y en a.
-update public.activities
-   set starts_on = scheduled_on
- where starts_on is null and scheduled_on is not null;
+-- Reprise des activités déjà programmées, s'il y en a. Le test rend le script
+-- rejouable : après un passage réussi, la colonne n'existe plus.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'activities' and column_name = 'scheduled_on'
+  ) then
+    execute 'update public.activities set starts_on = scheduled_on
+             where starts_on is null and scheduled_on is not null';
+  end if;
+end $$;
+
+-- La policy d'insertion de la 0003 teste `scheduled_on` : tant qu'elle existe,
+-- Postgres refuse de supprimer la colonne. On la retire d'abord, on la
+-- recrée plus bas dans sa version définitive.
+drop policy if exists activities_insert on public.activities;
 
 alter table public.activities drop constraint if exists activities_check;
 alter table public.activities drop column if exists scheduled_on;
@@ -67,10 +80,8 @@ $fn$;
 
 
 -- ----------------------------------------------------------------------------
--- 3. Policy d'insertion
+-- 3. Policy d'insertion, sans la condition sur scheduled_on
 -- ----------------------------------------------------------------------------
--- La condition portait sur scheduled_on, qui n'existe plus.
-drop policy if exists activities_insert on public.activities;
 create policy activities_insert on public.activities for insert to authenticated
   with check (
     author_id = auth.uid()
