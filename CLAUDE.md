@@ -16,7 +16,7 @@ Application web permettant de créer et organiser des roadtrips collaboratifs. L
 - **URL** : https://rzmdjmuiburllzylrvxe.supabase.co
 - **Clés** : uniquement via `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (`.env.local`, et variables d'env Vercel). Ne jamais réintroduire de valeur en dur dans le code.
 - **Storage bucket** : trip-photos (lecture publique, écriture authentifiée)
-- **Migration de référence** : `supabase/migrations/0001_auth_rls.sql`
+- **Migrations** : `supabase/migrations/0001_auth_rls.sql` (schéma + RLS), `0002_stages_overlap_and_owner.sql` (chevauchement, présence de l'organisateur, profils orphelins)
 
 ## Schéma base de données
 ```sql
@@ -58,6 +58,7 @@ id, user_id, trip_id, stage_id, actor_id, type, payload, read_at, created_at
 - **Le contrôle d'accès au dashboard est côté serveur** (`app/dashboard/[slug]/page.tsx` compare `owner_id` à l'utilisateur). Ne jamais le redescendre côté client.
 - **`proxy.ts`** rafraîchit la session à chaque navigation et bloque `/dashboard`, `/creer`, `/compte` sans session. Utiliser `getUser()`, jamais `getSession()`, côté serveur.
 - Un membre ne peut pas modifier son propre `status` : le trigger `guard_member_update` le refuse.
+- `getCurrentProfile()` recrée le profil s'il manque : un compte sans ligne dans `profiles` faisait échouer toutes les écritures sur une violation de clé étrangère.
 
 ## Structure des fichiers
 ```
@@ -73,6 +74,8 @@ components/
   Landing.tsx, CodeEntry.tsx    # Accueil déconnecté, saisie du code
   TopBar.tsx, NotificationBell.tsx
   JoinFlow.tsx                  # Dates → étapes pré-cochées → demande
+  StagePanel.tsx                # Discussion + album + aperçu photo (autonome)
+  SessionSync.tsx               # Recharge quand le compte connecté change
   TripMap.tsx, ShareButton.tsx
 app/
   page.tsx                      # Landing si déconnecté, "Mes trips" sinon
@@ -92,14 +95,17 @@ app/
 2. **Participant** : / → entre le code → /trip/[slug] (détails visibles sans compte) → "Je viens" → inscription → dates → étapes pré-cochées, il décoche → demande en `pending`
 3. **Validation** : l'organisateur reçoit une notif in-app → onglet Potes → Valider → le pote passe `approved`
 4. **Accès débloqué** : le pote validé ouvre chaque étape → messagerie realtime + album photo
-5. **Planning** : onglet Planning du dashboard → frise jour par jour, qui est là et où
-6. **Ses dates** : organisateur comme pote validé peuvent (re)déclarer leurs dates depuis la page du trip — même écran `JoinFlow`, en mode édition
+5. **Planning** : onglet Planning du dashboard, ouvert par défaut → frise jour par jour
+6. **Étapes** : sur écran large, deux colonnes — étapes modifiables à gauche, discussion et album de l'étape choisie à droite. Sous 1024 px, on navigue vers `/stage/[id]`.
+7. **Ses dates** : organisateur comme pote validé peuvent (re)déclarer leurs dates depuis la page du trip — même écran `JoinFlow`, en mode édition
 
 ## Décisions techniques importantes
 - Next.js 16 : `params` et `searchParams` sont des Promises (`await` obligatoire)
 - Convention `proxy.ts` (l'ancienne `middleware.ts` est dépréciée en Next 16)
 - Leaflet est chargé par `import()` dans un `useEffect` (la lib touche `window` au chargement)
 - Le lint embarque les règles du compilateur React : pas de `setState` synchrone dans un effet, pas d'accès à une fonction déclarée plus bas. Charger l'état initial côté serveur et le passer en prop.
+- **Étapes : `[arrivée, départ)`.** Le jour de départ reste libre pour l'étape suivante — Biarritz 28→29 puis Bayonne 29→31 est valide, les deux sur 28→29 ne l'est pas. Vérifié côté client (`stageSpan`/`spansOverlap`) *et* par le trigger `check_stage_overlap`, qui renvoie un message préfixé `CHEVAUCHEMENT|`.
+- **L'organisateur est inscrit d'office sur chaque étape créée** (trigger `add_owner_participation`) et peut se retirer depuis l'onglet Étapes.
 - **Ne jamais utiliser `toISOString()` pour produire une date YYYY-MM-DD** : il convertit en UTC et décale d'un jour toute date à minuit heure française. Passer par `iso()` de `lib/dates.ts`, qui lit les composantes locales.
 - Tuiles de carte : fond sombre **Esri** (`World_Dark_Gray_Base`), gratuit et sans clé. Les tuiles CARTO exigent une clé API depuis 2024.
 - Géocodage via OSM Nominatim, proxifié par `/api/geocode` (User-Agent impossible à définir depuis le navigateur, et évite l'abus côté client)

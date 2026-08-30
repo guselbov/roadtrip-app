@@ -77,3 +77,18 @@ export function daysBetween(start: string, end: string): string[] {
   for (let d = s; d <= e; d = new Date(d.getTime() + DAY)) out.push(iso(d))
   return out
 }
+
+/**
+ * Emprise d'une étape sous forme [arrivée, départ) : le jour de départ reste
+ * libre pour l'étape suivante. Une étape d'un seul jour occupe quand même
+ * ce jour, sinon elle n'entrerait jamais en conflit.
+ */
+export function stageSpan(start: string, end: string): [string, string] {
+  const close = end > start ? end : iso(new Date(toDate(start).getTime() + DAY))
+  return [start, close]
+}
+
+/** Deux emprises se chevauchent-elles ? Les bornes ISO se comparent en texte. */
+export function spansOverlap(a: [string, string], b: [string, string]) {
+  return a[0] < b[1] && b[0] < a[1]
+}

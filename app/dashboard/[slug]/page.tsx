@@ -48,6 +48,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
         stages={(stages ?? []) as Stage[]}
         members={(members ?? []) as unknown as TripMember[]}
         participations={(participations ?? []) as Participation[]}
+        me={profile}
       />
     </main>
   )

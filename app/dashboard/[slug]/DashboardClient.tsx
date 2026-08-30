@@ -9,7 +9,7 @@ import { StagesTab } from "./StagesTab"
 import { PlanningTab } from "./PlanningTab"
 import { formatLongRange } from "@/lib/dates"
 import { C, card, container, input, label } from "@/lib/ui"
-import type { MemberStatus, Participation, Stage, Trip, TripMember } from "@/lib/types"
+import type { MemberStatus, Participation, Profile, Stage, Trip, TripMember } from "@/lib/types"
 
 type Tab = "planning" | "potes" | "etapes"
 
@@ -18,11 +18,13 @@ export function DashboardClient({
   stages: initialStages,
   members: initialMembers,
   participations: initialParticipations,
+  me,
 }: {
   trip: Trip
   stages: Stage[]
   members: TripMember[]
   participations: Participation[]
+  me: Profile
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -67,6 +69,7 @@ export function DashboardClient({
 
   const pendingCount = members.filter(m => m.status === "pending").length
   const approvedCount = members.filter(m => m.status === "approved" && m.role !== "owner").length
+  const ownerMemberId = members.find(m => m.role === "owner")?.id ?? null
 
   async function copyCode() {
     try {
@@ -117,7 +120,7 @@ export function DashboardClient({
   ]
 
   return (
-    <div style={{ ...container, paddingBottom: "60px" }}>
+    <div style={{ ...container, maxWidth: tab === "etapes" ? "1100px" : container.maxWidth, paddingBottom: "60px" }}>
       <Link href="/" style={{ color: C.muted, fontSize: "14px", textDecoration: "none", display: "inline-block", marginBottom: "18px" }}>
         ← Mes trips
       </Link>
@@ -210,7 +213,12 @@ export function DashboardClient({
           tripId={trip.id}
           stages={stages}
           participations={participations}
+          ownerMemberId={ownerMemberId}
+          me={me}
+          tripStart={trip.date_start}
+          tripEnd={trip.date_end}
           onChange={setStages}
+          onParticipationsChange={setParticipations}
         />
       )}
 
