@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { C, avatarColor, card, input, label } from "@/lib/ui"
+import { C, avatarStyle, card, input, label } from "@/lib/ui"
 import type { Profile } from "@/lib/types"
 
 export function AccountForm({ profile }: { profile: Profile }) {
@@ -31,7 +31,7 @@ export function AccountForm({ profile }: { profile: Profile }) {
   return (
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-        <span style={{ width: "48px", height: "48px", borderRadius: "50%", background: avatarColor(profile.id), display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", fontWeight: 800 }}>
+        <span style={avatarStyle(profile.id, 48)}>
           {(name || "?").charAt(0).toUpperCase()}
         </span>
         <p style={{ fontSize: "13px", color: C.muted, lineHeight: 1.4 }}>

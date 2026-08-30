@@ -1,17 +1,33 @@
 import type { CSSProperties } from "react"
 
 export const C = {
-  bg: "#0e1409",
-  card: "#141a0e",
-  card2: "#1a2212",
-  green: "#2d4a1e",
-  greenLight: "#3d6429",
-  accent: "#8fb840",
-  text: "#e8e4d9",
-  muted: "#7a8a6a",
-  dim: "#4a5a3a",
-  warn: "#c07040",
+  // Fond volontairement très sombre : la carte et les photos y ressortent.
+  bg: "#0b120f",
+  card: "#141e18",
+  card2: "#1c2a22",
+  green: "#1f4030",
+  greenLight: "#2f6244",
+
+  // Accents vifs
+  accent: "#a3e635",   // vert citron — action principale
+  teal: "#2dd4bf",
+  coral: "#ff7a59",
+  amber: "#fbbf24",
+  violet: "#a78bfa",
+  sky: "#38bdf8",
+
+  text: "#eef4ea",
+  muted: "#8ea684",
+  dim: "#56694f",
+  warn: "#ff7a59",
 } as const
+
+/** Une couleur par étape, réutilisée partout : planning, liste, carte, album. */
+export const STAGE_COLORS = [C.accent, C.coral, C.teal, C.amber, C.violet, C.sky] as const
+
+export function stageColor(index: number) {
+  return STAGE_COLORS[index % STAGE_COLORS.length]
+}
 
 export const page: CSSProperties = {
   background: C.bg,
@@ -27,12 +43,13 @@ export const container: CSSProperties = {
 
 export const card: CSSProperties = {
   background: C.card,
-  borderRadius: "16px",
+  borderRadius: "18px",
   padding: "16px",
+  border: `1px solid ${C.card2}`,
 }
 
 export const input: CSSProperties = {
-  background: C.card,
+  background: C.bg,
   border: `1px solid ${C.green}`,
   color: C.text,
   borderRadius: "12px",
@@ -45,15 +62,16 @@ export const input: CSSProperties = {
 
 export const btnPrimary: CSSProperties = {
   background: C.accent,
-  color: C.bg,
+  color: "#0b120f",
   border: "none",
   borderRadius: "100px",
   padding: "16px",
   width: "100%",
   cursor: "pointer",
   fontSize: "16px",
-  fontWeight: 700,
+  fontWeight: 800,
   fontFamily: "inherit",
+  boxShadow: "0 6px 20px rgba(163, 230, 53, 0.18)",
 }
 
 export const btnGhost: CSSProperties = {
@@ -76,6 +94,14 @@ export const label: CSSProperties = {
   marginBottom: "6px",
 }
 
+export const sectionTitle: CSSProperties = {
+  fontSize: "11px",
+  color: C.dim,
+  letterSpacing: "1.5px",
+  fontWeight: 700,
+  marginBottom: "12px",
+}
+
 export const pill: CSSProperties = {
   background: C.green,
   color: C.accent,
@@ -85,10 +111,39 @@ export const pill: CSSProperties = {
   fontWeight: 700,
 }
 
+/** Pastille colorée douce : fond teinté, texte dans la même couleur. */
+export function tint(color: string, alpha = 0.16): CSSProperties {
+  return { background: hexA(color, alpha), color, border: `1px solid ${hexA(color, 0.35)}` }
+}
+
+function hexA(hex: string, alpha: number) {
+  const n = parseInt(hex.slice(1), 16)
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 /** Couleur d'avatar stable, dérivée de l'id du profil. */
-const AVATARS = ["#2d4a1e", "#5c3d2e", "#3d6429", "#7a5240", "#4a5a3a", "#6b4a2a"]
+const AVATARS = [C.accent, C.coral, C.teal, C.amber, C.violet, C.sky]
 export function avatarColor(id: string) {
   let h = 0
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
   return AVATARS[h % AVATARS.length]
+}
+
+/** Avatar complet. Le texte est sombre : les accents sont clairs et saturés. */
+export function avatarStyle(id: string, size = 36): CSSProperties {
+  return {
+    width: size + "px",
+    height: size + "px",
+    borderRadius: "50%",
+    background: avatarColor(id),
+    color: "#0b120f",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 800,
+    fontSize: Math.round(size * 0.42) + "px",
+    flexShrink: 0,
+    textDecoration: "none",
+  }
 }

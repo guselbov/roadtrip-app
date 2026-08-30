@@ -1,9 +1,7 @@
 "use client"
 import { daysBetween, toDate } from "@/lib/dates"
-import { C, avatarColor } from "@/lib/ui"
+import { C, avatarStyle, stageColor } from "@/lib/ui"
 import type { Participation, Stage, TripMember } from "@/lib/types"
-
-const STAGE_COLORS = ["#8fb840", "#c07040", "#5a9bd4", "#b06fb0", "#d0a850", "#4fb0a0"]
 
 /** Frise jour par jour : qui est là, et où. La vue que l'organisateur n'avait pas. */
 export function PlanningTab({
@@ -30,7 +28,7 @@ export function PlanningTab({
 
   if (bounds.length === 0 || approved.length === 0) {
     return (
-      <div style={{ background: C.card, borderRadius: "16px", padding: "28px 20px", textAlign: "center", color: C.muted, fontSize: "14px", lineHeight: 1.5 }}>
+      <div style={{ background: C.card, border: `1px solid ${C.card2}`, borderRadius: "18px", padding: "28px 20px", textAlign: "center", color: C.muted, fontSize: "14px", lineHeight: 1.5 }}>
         {approved.length === 0
           ? "Valide au moins un pote pour voir le planning se remplir."
           : "Ajoute des dates à tes étapes pour construire le planning."}
@@ -42,7 +40,7 @@ export function PlanningTab({
   const end = bounds.reduce((a, b) => (a > b ? a : b))
   const days = daysBetween(start, end)
 
-  const colorOf = new Map(stages.map((s, i) => [s.id, STAGE_COLORS[i % STAGE_COLORS.length]]))
+  const colorOf = new Map(stages.map((s, i) => [s.id, stageColor(i)]))
   const byMember = new Map<string, Participation[]>()
   for (const p of participations) {
     const list = byMember.get(p.member_id) ?? []
@@ -64,7 +62,7 @@ export function PlanningTab({
         ))}
       </div>
 
-      <div style={{ overflowX: "auto", background: C.card, borderRadius: "16px", padding: "14px" }}>
+      <div style={{ overflowX: "auto", background: C.card, border: `1px solid ${C.card2}`, borderRadius: "18px", padding: "14px" }}>
         <div style={{ minWidth: NAME_W + days.length * CELL + "px" }}>
           {/* En-tête : les jours */}
           <div style={{ display: "flex", marginBottom: "6px" }}>
@@ -87,7 +85,7 @@ export function PlanningTab({
             return (
               <div key={m.id} style={{ display: "flex", alignItems: "center", marginBottom: "4px" }}>
                 <div style={{ width: NAME_W + "px", flexShrink: 0, display: "flex", alignItems: "center", gap: "6px", paddingRight: "8px" }}>
-                  <span style={{ width: "20px", height: "20px", borderRadius: "50%", background: avatarColor(m.user_id), fontSize: "10px", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={avatarStyle(m.user_id, 22)}>
                     {(m.profiles?.display_name ?? "?").charAt(0).toUpperCase()}
                   </span>
                   <span style={{ fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -102,8 +100,8 @@ export function PlanningTab({
                       <div
                         title={here ? stages.find(s => s.id === here.stage_id)?.name : undefined}
                         style={{
-                          height: "22px",
-                          borderRadius: "5px",
+                          height: "24px",
+                          borderRadius: "7px",
                           background: here ? colorOf.get(here.stage_id) : C.bg,
                           opacity: here ? 0.9 : 1,
                         }}

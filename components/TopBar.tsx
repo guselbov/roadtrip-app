@@ -3,7 +3,7 @@ import { NotificationBell, type NotifRow } from "./NotificationBell"
 import { SessionSync } from "./SessionSync"
 import { createClient } from "@/lib/supabase/server"
 import { authUrl } from "@/lib/auth"
-import { C, avatarColor } from "@/lib/ui"
+import { C, avatarStyle } from "@/lib/ui"
 import type { Profile } from "@/lib/types"
 
 export async function TopBar({ profile, next = "/" }: { profile: Profile | null; next?: string }) {
@@ -32,7 +32,7 @@ export async function TopBar({ profile, next = "/" }: { profile: Profile | null;
             <Link
               href="/compte"
               title={profile.display_name}
-              style={{ width: "38px", height: "38px", borderRadius: "50%", background: avatarColor(profile.id), display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: 800, color: C.text, textDecoration: "none", flexShrink: 0 }}
+              style={avatarStyle(profile.id, 38)}
             >
               {profile.display_name.charAt(0).toUpperCase()}
             </Link>

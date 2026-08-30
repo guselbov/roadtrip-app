@@ -8,6 +8,7 @@ interface Point {
   name: string
   lat: number | null
   lng: number | null
+  color?: string
 }
 
 type PlacedPoint = Omit<Point, "lat" | "lng"> & { lat: number; lng: number }
@@ -55,7 +56,7 @@ export function TripMap({ points, height = 260 }: { points: Point[]; height?: nu
         L.marker([p.lat, p.lng], {
           icon: L.divIcon({
             className: "",
-            html: `<div style="background:${C.accent};color:${C.bg};width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;border:2px solid ${C.bg};box-shadow:0 2px 6px rgba(0,0,0,.5)">${i + 1}</div>`,
+            html: `<div style="background:${p.color ?? C.accent};color:${C.bg};width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;border:2px solid ${C.bg};box-shadow:0 2px 6px rgba(0,0,0,.5)">${i + 1}</div>`,
             iconSize: [26, 26],
             iconAnchor: [13, 13],
           }),

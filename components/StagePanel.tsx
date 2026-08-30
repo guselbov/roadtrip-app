@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatRange } from "@/lib/dates"
 import { dbError } from "@/lib/errors"
-import { C, avatarColor, card, input } from "@/lib/ui"
+import { C, avatarStyle, card, input } from "@/lib/ui"
 import type { Message, Photo, Profile } from "@/lib/types"
 
 interface Crew { userId: string; name: string; start: string; end: string }
@@ -208,7 +208,7 @@ export function StagePanel({
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
             {crew.map(c => (
               <span key={c.userId} style={{ display: "flex", alignItems: "center", gap: "7px", background: C.bg, borderRadius: "100px", padding: "5px 12px 5px 5px" }}>
-                <span style={{ width: "22px", height: "22px", borderRadius: "50%", background: avatarColor(c.userId), fontSize: "10px", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={avatarStyle(c.userId, 22)}>
                   {c.name.charAt(0).toUpperCase()}
                 </span>
                 <span style={{ fontSize: "12px" }}>{c.name}</span>

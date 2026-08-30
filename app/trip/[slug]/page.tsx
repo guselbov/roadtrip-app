@@ -7,7 +7,7 @@ import { ShareButton } from "@/components/ShareButton"
 import { TripMap } from "@/components/TripMap"
 import { JoinFlow } from "@/components/JoinFlow"
 import { formatLongRange, formatRange } from "@/lib/dates"
-import { C, avatarColor, card, container, page } from "@/lib/ui"
+import { C, avatarStyle, card, container, page, stageColor } from "@/lib/ui"
 import type { MemberStatus, PublicTrip, Stage } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -103,7 +103,7 @@ export default async function TripPage({ params }: { params: Promise<{ slug: str
         {/* CARTE */}
         {stages.some(s => s.lat != null) && (
           <div style={{ marginBottom: "20px" }}>
-            <TripMap points={stages.map(s => ({ id: s.id, name: s.name, lat: s.lat, lng: s.lng }))} />
+            <TripMap points={stages.map((s, i) => ({ id: s.id, name: s.name, lat: s.lat, lng: s.lng, color: stageColor(i) }))} />
           </div>
         )}
 
@@ -228,7 +228,7 @@ export default async function TripPage({ params }: { params: Promise<{ slug: str
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
               {crew.map(c => (
                 <span key={c.user_id} style={{ display: "flex", alignItems: "center", gap: "7px", background: C.card, borderRadius: "100px", padding: "5px 12px 5px 5px" }}>
-                  <span style={{ width: "24px", height: "24px", borderRadius: "50%", background: avatarColor(c.user_id), display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 800 }}>
+                  <span style={avatarStyle(c.user_id, 24)}>
                     {(c.profiles?.display_name ?? "?").charAt(0).toUpperCase()}
                   </span>
                   <span style={{ fontSize: "13px" }}>{c.profiles?.display_name ?? "—"}</span>
@@ -253,7 +253,7 @@ export default async function TripPage({ params }: { params: Promise<{ slug: str
               <>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "10px", marginBottom: "6px" }}>
                   <span style={{ display: "flex", alignItems: "center", gap: "9px" }}>
-                    <span style={{ width: "24px", height: "24px", borderRadius: "50%", background: C.green, color: C.accent, fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <span style={{ width: "26px", height: "26px", borderRadius: "9px", background: stageColor(i), color: "#0b120f", fontSize: "12px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       {i + 1}
                     </span>
                     <span style={{ fontWeight: 700, fontSize: "17px" }}>{s.name}</span>

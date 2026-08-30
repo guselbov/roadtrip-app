@@ -1,54 +1,41 @@
 "use client"
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
-import { useRouter } from "next/navigation"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { StagePanel } from "@/components/StagePanel"
 import { formatRange, spansOverlap, stageSpan } from "@/lib/dates"
 import { dbError } from "@/lib/errors"
-import { C, btnPrimary, card, input, label } from "@/lib/ui"
-import type { Participation, Profile, Stage } from "@/lib/types"
+import { C, btnPrimary, card, input, label, stageColor, tint } from "@/lib/ui"
+import type { Participation, Stage } from "@/lib/types"
 
 interface GeoResult { name: string; label: string; lat: number; lng: number }
 
 const EMPTY = { name: "", description: "", date_start: "", date_end: "", lat: null as number | null, lng: null as number | null }
-
-/** Deux colonnes seulement quand l'écran le permet ; sinon on navigue. */
-function useIsWide() {
-  return useSyncExternalStore(
-    cb => {
-      const mq = window.matchMedia("(min-width: 1024px)")
-      mq.addEventListener("change", cb)
-      return () => mq.removeEventListener("change", cb)
-    },
-    () => window.matchMedia("(min-width: 1024px)").matches,
-    () => false
-  )
-}
 
 export function StagesTab({
   tripId,
   stages,
   participations,
   ownerMemberId,
-  me,
   tripStart,
   tripEnd,
+  selectedStageId,
+  onOpenStage,
   onChange,
   onParticipationsChange,
+  onRefresh,
 }: {
   tripId: string
   stages: Stage[]
   participations: Participation[]
   ownerMemberId: string | null
-  me: Profile
   tripStart: string | null
   tripEnd: string | null
+  selectedStageId: string | null
+  onOpenStage: (stageId: string) => void
   onChange: (stages: Stage[]) => void
   onParticipationsChange: (p: Participation[]) => void
+  onRefresh: () => void
 }) {
-  const router = useRouter()
   const supabase = createClient()
-  const isWide = useIsWide()
 
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState(EMPTY)
@@ -58,7 +45,6 @@ export function StagesTab({
   const [error, setError] = useState("")
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState<Partial<Stage>>({})
-  const [selected, setSelected] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const pickedRef = useRef(false)
 
@@ -149,7 +135,7 @@ export function StagesTab({
     pickedRef.current = false
     setAdding(false)
     // Le trigger vient d'inscrire l'organisateur sur l'étape.
-    router.refresh()
+    onRefresh()
   }
 
   /** Le trigger de la base renvoie un message balisé qu'on reformule ici. */
@@ -181,7 +167,7 @@ export function StagesTab({
     if (error) { setError(stageError(error)); return }
     onChange(stages.map(s => (s.id === id ? { ...s, ...patch } as Stage : s)))
     setEditing(null)
-    router.refresh()
+    onRefresh()
   }
 
   async function remove(s: Stage) {
@@ -230,12 +216,7 @@ export function StagesTab({
       if (error || !data) { setError(dbError(error)); return }
       onParticipationsChange([...participations, data as Participation])
     }
-    router.refresh()
-  }
-
-  function openStage(s: Stage) {
-    if (isWide) setSelected(s.id)
-    else router.push("/stage/" + s.id)
+    onRefresh()
   }
 
   const dateBounds = { min: tripStart ?? undefined, max: tripEnd ?? undefined }
@@ -248,11 +229,14 @@ export function StagesTab({
             JOURS DÉJÀ OCCUPÉS
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-            {booked.map(s => (
-              <span key={s.id} style={{ background: C.bg, borderRadius: "20px", padding: "4px 10px", fontSize: "12px", color: C.muted }}>
-                {s.name} · {formatRange(s.date_start, s.date_end)}
-              </span>
-            ))}
+            {booked.map(s => {
+              const color = stageColor(stages.findIndex(x => x.id === s.id))
+              return (
+                <span key={s.id} style={{ ...tint(color), borderRadius: "20px", padding: "4px 10px", fontSize: "12px", fontWeight: 600 }}>
+                  {s.name} · {formatRange(s.date_start, s.date_end)}
+                </span>
+              )
+            })}
           </div>
           <p style={{ fontSize: "11px", color: C.dim, marginTop: "8px", lineHeight: 1.45 }}>
             Le jour de départ d&apos;une étape peut servir de jour d&apos;arrivée à la suivante.
@@ -266,7 +250,7 @@ export function StagesTab({
         const mine = ownerMemberId
           ? participations.some(p => p.stage_id === s.id && p.member_id === ownerMemberId)
           : false
-        const isSelected = selected === s.id
+        const isSelected = selectedStageId === s.id
 
         return (
           <div
@@ -274,7 +258,7 @@ export function StagesTab({
             style={{
               ...card,
               marginBottom: "10px",
-              border: `1px solid ${isSelected ? C.greenLight : "transparent"}`,
+              border: `1px solid ${isSelected ? stageColor(i) : C.card2}`,
             }}
           >
             {isEditing ? (
@@ -300,11 +284,11 @@ export function StagesTab({
             ) : (
               <>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-                  <span style={{ width: "26px", height: "26px", borderRadius: "50%", background: C.green, color: C.accent, fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "2px" }}>
+                  <span style={{ width: "28px", height: "28px", borderRadius: "9px", background: stageColor(i), color: "#0b120f", fontSize: "13px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "2px" }}>
                     {i + 1}
                   </span>
                   <button
-                    onClick={() => openStage(s)}
+                    onClick={() => onOpenStage(s.id)}
                     style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer", fontFamily: "inherit", color: C.text }}
                   >
                     <span style={{ display: "block", fontWeight: 700, fontSize: "16px" }}>{s.name}</span>
@@ -347,7 +331,7 @@ export function StagesTab({
                   <button onClick={() => remove(s)} style={{ background: "none", border: "none", color: C.dim, fontSize: "12px", cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
                     Supprimer
                   </button>
-                  <button onClick={() => openStage(s)} style={{ background: "none", border: "none", color: C.muted, fontSize: "12px", cursor: "pointer", padding: 0, fontFamily: "inherit", marginLeft: "auto" }}>
+                  <button onClick={() => onOpenStage(s.id)} style={{ background: "none", border: "none", color: C.muted, fontSize: "12px", cursor: "pointer", padding: 0, fontFamily: "inherit", marginLeft: "auto" }}>
                     Discussion →
                   </button>
                 </div>
@@ -427,23 +411,5 @@ export function StagesTab({
     </div>
   )
 
-  if (!isWide) return list
-
-  const selectedStage = stages.find(s => s.id === selected) ?? null
-
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.05fr)", gap: "20px", alignItems: "start" }}>
-      {list}
-      <div style={{ position: "sticky", top: "16px" }}>
-        {selectedStage ? (
-          <StagePanel key={selectedStage.id} stageId={selectedStage.id} me={me} />
-        ) : (
-          <div style={{ ...card, padding: "40px 24px", textAlign: "center", color: C.muted, fontSize: "14px", lineHeight: 1.6 }}>
-            <div style={{ fontSize: "32px", marginBottom: "10px" }}>💬</div>
-            Choisis une étape à gauche pour voir la discussion et l&apos;album de tes potes.
-          </div>
-        )}
-      </div>
-    </div>
-  )
+  return list
 }

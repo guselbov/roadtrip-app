@@ -1,17 +1,38 @@
 "use client"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { ShareButton } from "@/components/ShareButton"
+import { StagePanel } from "@/components/StagePanel"
 import { MembersTab } from "./MembersTab"
 import { StagesTab } from "./StagesTab"
 import { PlanningTab } from "./PlanningTab"
 import { formatLongRange } from "@/lib/dates"
-import { C, card, container, input, label } from "@/lib/ui"
+import { C, card, input, label, sectionTitle, tint } from "@/lib/ui"
 import type { MemberStatus, Participation, Profile, Stage, Trip, TripMember } from "@/lib/types"
 
-type Tab = "planning" | "potes" | "etapes"
+/** La colonne discussion n'a de sens qu'au-delà d'une certaine largeur. */
+function useIsWide() {
+  return useSyncExternalStore(
+    cb => {
+      const mq = window.matchMedia("(min-width: 1024px)")
+      mq.addEventListener("change", cb)
+      return () => mq.removeEventListener("change", cb)
+    },
+    () => window.matchMedia("(min-width: 1024px)").matches,
+    () => false
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 style={sectionTitle}>{title}</h2>
+      {children}
+    </section>
+  )
+}
 
 export function DashboardClient({
   trip: initialTrip,
@@ -28,11 +49,13 @@ export function DashboardClient({
 }) {
   const router = useRouter()
   const supabase = createClient()
+  const isWide = useIsWide()
+
   const [trip, setTrip] = useState(initialTrip)
   const [stages, setStages] = useState(initialStages)
   const [members, setMembers] = useState(initialMembers)
   const [participations, setParticipations] = useState(initialParticipations)
-  const [tab, setTab] = useState<Tab>("planning")
+  const [selectedStageId, setSelectedStageId] = useState<string | null>(initialStages[0]?.id ?? null)
   const [settings, setSettings] = useState(false)
   const [draft, setDraft] = useState({
     title: initialTrip.title,
@@ -43,7 +66,7 @@ export function DashboardClient({
   const [copied, setCopied] = useState(false)
 
   // Les demandes arrivent pendant que l'organisateur regarde la page : sans
-  // cette souscription, rien ne bouge tant qu'il ne recharge pas lui-meme.
+  // cette souscription, rien ne bouge tant qu'il ne recharge pas lui-même.
   useEffect(() => {
     const channel = supabase
       .channel("trip-members-" + trip.id)
@@ -56,9 +79,9 @@ export function DashboardClient({
     return () => { supabase.removeChannel(channel) }
   }, [supabase, trip.id, router])
 
-  // Le rendu serveur fait autorite : on resynchronise quand router.refresh()
-  // renvoie de nouvelles donnees. Ajustement pendant le rendu plutot qu'en
-  // effet, comme recommande par React pour un etat derive de props.
+  // Le rendu serveur fait autorité : on resynchronise quand router.refresh()
+  // renvoie de nouvelles données. Ajustement pendant le rendu plutôt qu'en
+  // effet, comme recommandé par React pour un état dérivé de props.
   const [seen, setSeen] = useState({ m: initialMembers, p: initialParticipations, s: initialStages })
   if (seen.m !== initialMembers || seen.p !== initialParticipations || seen.s !== initialStages) {
     setSeen({ m: initialMembers, p: initialParticipations, s: initialStages })
@@ -70,6 +93,7 @@ export function DashboardClient({
   const pendingCount = members.filter(m => m.status === "pending").length
   const approvedCount = members.filter(m => m.status === "approved" && m.role !== "owner").length
   const ownerMemberId = members.find(m => m.role === "owner")?.id ?? null
+  const selectedStage = stages.find(s => s.id === selectedStageId) ?? null
 
   async function copyCode() {
     try {
@@ -113,165 +137,189 @@ export function DashboardClient({
     setParticipations(ps => ps.filter(p => p.member_id !== id))
   }
 
-  const TABS: { key: Tab; text: string; badge?: number }[] = [
-    { key: "planning", text: "Planning" },
-    { key: "potes", text: "Potes", badge: pendingCount },
-    { key: "etapes", text: "Étapes" },
+  function openStage(stageId: string) {
+    if (isWide) setSelectedStageId(stageId)
+    else router.push("/stage/" + stageId)
+  }
+
+  const stats = [
+    { value: stages.length, label: stages.length > 1 ? "étapes" : "étape", color: C.accent },
+    { value: approvedCount, label: approvedCount > 1 ? "potes" : "pote", color: C.teal },
+    { value: pendingCount, label: "en attente", color: pendingCount > 0 ? C.amber : C.dim },
   ]
 
   return (
-    <div style={{ ...container, maxWidth: tab === "etapes" ? "1100px" : container.maxWidth, paddingBottom: "60px" }}>
-      <Link href="/" style={{ color: C.muted, fontSize: "14px", textDecoration: "none", display: "inline-block", marginBottom: "18px" }}>
-        ← Mes trips
-      </Link>
+    <>
+      <style>{`
+        .dash { max-width: 560px; margin: 0 auto; padding: 0 20px 60px; }
+        .dash-grid { display: grid; gap: 18px; grid-template-columns: 1fr; align-items: start; }
+        .dash-chat { display: none; }
+        @media (min-width: 1024px) {
+          .dash { max-width: 1080px; }
+          .dash-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+          .dash-chat { display: block; position: sticky; top: 16px; }
+          .dash-crew { grid-column: 1 / -1; }
+        }
+        @media (min-width: 1440px) {
+          .dash { max-width: 1400px; }
+          .dash-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(300px, 0.9fr); }
+          .dash-crew { grid-column: auto; position: sticky; top: 16px; }
+        }
+      `}</style>
 
-      <h1 style={{ fontSize: "26px", fontWeight: 800, lineHeight: 1.15 }}>{trip.title}</h1>
-      <p style={{ color: C.muted, fontSize: "14px", marginTop: "6px" }}>
-        {formatLongRange(trip.date_start, trip.date_end) || "Dates à définir"} · {approvedCount} pote{approvedCount > 1 ? "s" : ""} confirmé{approvedCount > 1 ? "s" : ""}
-      </p>
+      <div className="dash">
+        <Link href="/" style={{ color: C.muted, fontSize: "14px", textDecoration: "none", display: "inline-block", marginBottom: "14px" }}>
+          ← Mes trips
+        </Link>
 
-      {/* Code de partage */}
-      <div style={{ ...card, marginTop: "18px", marginBottom: "18px" }}>
-        <div style={{ fontSize: "11px", color: C.muted, letterSpacing: "1px", marginBottom: "8px" }}>
-          CODE À ENVOYER À TES POTES
+        {/* En-tête */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "18px" }}>
+          <div>
+            <h1 style={{ fontSize: "clamp(26px, 4vw, 34px)", fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.5px" }}>
+              {trip.title}
+            </h1>
+            <p style={{ color: C.muted, fontSize: "14px", marginTop: "6px" }}>
+              {formatLongRange(trip.date_start, trip.date_end) || "Dates à définir"}
+            </p>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            {stats.map(s => (
+              <div key={s.label} style={{ ...tint(s.color, 0.1), borderRadius: "14px", padding: "8px 14px", textAlign: "center", minWidth: "78px" }}>
+                <div style={{ fontSize: "20px", fontWeight: 800, lineHeight: 1.1 }}>{s.value}</div>
+                <div style={{ fontSize: "11px", opacity: 0.85 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+
+        {/* Code de partage */}
+        <div style={{ ...card, marginBottom: "16px", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "11px", color: C.muted, letterSpacing: "1px" }}>CODE</span>
           <button
             onClick={copyCode}
-            style={{ background: C.bg, border: `1px dashed ${C.greenLight}`, color: copied ? C.accent : C.text, borderRadius: "12px", padding: "12px 18px", fontSize: "22px", fontWeight: 800, letterSpacing: "5px", fontFamily: "monospace", cursor: "pointer" }}
+            style={{ background: C.bg, border: `1px dashed ${copied ? C.accent : C.greenLight}`, color: copied ? C.accent : C.text, borderRadius: "12px", padding: "10px 16px", fontSize: "20px", fontWeight: 800, letterSpacing: "5px", fontFamily: "monospace", cursor: "pointer" }}
           >
             {copied ? "COPIÉ ✓" : trip.code}
           </button>
           <ShareButton slug={trip.slug} title={trip.title} code={trip.code} />
           <Link href={"/trip/" + trip.slug} style={{ fontSize: "13px", color: C.muted, textDecoration: "none", borderBottom: `1px solid ${C.green}` }}>
-            Voir la page publique
+            Page publique
           </Link>
         </div>
-      </div>
 
-      {/* Les demandes ne doivent pas dependre de l'onglet ouvert */}
-      {pendingCount > 0 && (
-        <button
-          onClick={() => setTab("potes")}
-          style={{ width: "100%", background: C.accent, color: C.bg, border: "none", borderRadius: "16px", padding: "14px 16px", marginBottom: "14px", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "12px", textAlign: "left" }}
-        >
-          <span style={{ fontSize: "20px" }}>🔔</span>
-          <span style={{ flex: 1 }}>
-            <span style={{ display: "block", fontWeight: 800, fontSize: "15px" }}>
-              {pendingCount} pote{pendingCount > 1 ? "s" : ""} attend{pendingCount > 1 ? "ent" : ""} ta réponse
-            </span>
-            <span style={{ display: "block", fontSize: "13px", opacity: 0.75 }}>
-              Valide ou refuse pour débloquer {pendingCount > 1 ? "leur" : "son"} accès
-            </span>
-          </span>
-          <span style={{ fontSize: "18px", opacity: 0.6 }}>→</span>
-        </button>
-      )}
-
-      {/* Onglets */}
-      <div style={{ display: "flex", gap: "6px", marginBottom: "20px" }}>
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{
-              flex: 1,
-              background: tab === t.key ? C.green : C.card,
-              color: tab === t.key ? C.accent : C.muted,
-              border: "none",
-              borderRadius: "100px",
-              padding: "11px 8px",
-              fontSize: "14px",
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              position: "relative",
-            }}
-          >
-            {t.text}
-            {t.badge ? (
-              <span style={{ background: C.accent, color: C.bg, borderRadius: "10px", padding: "1px 6px", fontSize: "11px", marginLeft: "6px", fontWeight: 800 }}>
-                {t.badge}
+        {/* Demandes en attente : toujours en tête, jamais cachées */}
+        {pendingCount > 0 && (
+          <div style={{ ...tint(C.amber, 0.14), borderRadius: "16px", padding: "14px 16px", marginBottom: "18px", display: "flex", alignItems: "center", gap: "12px" }}>
+            <span style={{ fontSize: "20px" }}>🔔</span>
+            <span style={{ flex: 1 }}>
+              <span style={{ display: "block", fontWeight: 800, fontSize: "15px" }}>
+                {pendingCount} pote{pendingCount > 1 ? "s" : ""} attend{pendingCount > 1 ? "ent" : ""} ta réponse
               </span>
-            ) : null}
-          </button>
-        ))}
-      </div>
-
-      {tab === "potes" && (
-        <MembersTab
-          members={members}
-          stages={stages}
-          participations={participations}
-          onStatusChange={onStatusChange}
-          onRemove={onRemove}
-        />
-      )}
-
-      {tab === "etapes" && (
-        <StagesTab
-          tripId={trip.id}
-          stages={stages}
-          participations={participations}
-          ownerMemberId={ownerMemberId}
-          me={me}
-          tripStart={trip.date_start}
-          tripEnd={trip.date_end}
-          onChange={setStages}
-          onParticipationsChange={setParticipations}
-        />
-      )}
-
-      {tab === "planning" && (
-        <PlanningTab
-          stages={stages}
-          members={members}
-          participations={participations}
-          tripStart={trip.date_start}
-          tripEnd={trip.date_end}
-        />
-      )}
-
-      {/* Réglages */}
-      <div style={{ marginTop: "40px", borderTop: `1px solid ${C.card}`, paddingTop: "20px" }}>
-        {!settings ? (
-          <button onClick={() => setSettings(true)} style={{ background: "none", border: "none", color: C.muted, fontSize: "13px", cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-            ⚙ Réglages du trip
-          </button>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div>
-              <label style={label}>NOM</label>
-              <input value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} style={input} />
-            </div>
-            <div>
-              <label style={label}>DESCRIPTION</label>
-              <textarea rows={3} value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} style={{ ...input, resize: "vertical" }} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-              <div>
-                <label style={label}>DÉBUT</label>
-                <input type="date" value={draft.date_start} onChange={e => setDraft({ ...draft, date_start: e.target.value })} style={input} />
-              </div>
-              <div>
-                <label style={label}>FIN</label>
-                <input type="date" value={draft.date_end} min={draft.date_start || undefined} onChange={e => setDraft({ ...draft, date_end: e.target.value })} style={input} />
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button onClick={() => setSettings(false)} style={{ flex: 1, background: C.bg, border: `1px solid ${C.green}`, color: C.muted, borderRadius: "100px", padding: "12px", cursor: "pointer", fontFamily: "inherit" }}>
-                Annuler
-              </button>
-              <button onClick={saveSettings} style={{ flex: 1, background: C.accent, border: "none", color: C.bg, borderRadius: "100px", padding: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                Enregistrer
-              </button>
-            </div>
-            <button onClick={deleteTrip} style={{ background: "none", border: "none", color: C.warn, fontSize: "13px", cursor: "pointer", padding: "8px 0 0", fontFamily: "inherit" }}>
-              Supprimer le trip
-            </button>
+              <span style={{ display: "block", fontSize: "13px", opacity: 0.8 }}>
+                Ça se passe dans « Tes potes », plus bas.
+              </span>
+            </span>
           </div>
         )}
+
+        {/* Planning : le coup d'œil, sur toute la largeur */}
+        <div style={{ marginBottom: "22px" }}>
+          <Section title="LE PLANNING">
+            <PlanningTab
+              stages={stages}
+              members={members}
+              participations={participations}
+              tripStart={trip.date_start}
+              tripEnd={trip.date_end}
+            />
+          </Section>
+        </div>
+
+        <div className="dash-grid">
+          <Section title="LES ÉTAPES">
+            <StagesTab
+              tripId={trip.id}
+              stages={stages}
+              participations={participations}
+              ownerMemberId={ownerMemberId}
+              tripStart={trip.date_start}
+              tripEnd={trip.date_end}
+              selectedStageId={selectedStageId}
+              onOpenStage={openStage}
+              onChange={setStages}
+              onParticipationsChange={setParticipations}
+              onRefresh={() => router.refresh()}
+            />
+          </Section>
+
+          <div className="dash-chat">
+            <Section title={selectedStage ? "DISCUSSION · " + selectedStage.name.toUpperCase() : "DISCUSSION"}>
+              {selectedStage ? (
+                <StagePanel key={selectedStage.id} stageId={selectedStage.id} me={me} showHeader={false} />
+              ) : (
+                <div style={{ ...card, padding: "40px 24px", textAlign: "center", color: C.muted, fontSize: "14px", lineHeight: 1.6 }}>
+                  <div style={{ fontSize: "30px", marginBottom: "10px" }}>💬</div>
+                  Choisis une étape à gauche pour voir la discussion et l&apos;album.
+                </div>
+              )}
+            </Section>
+          </div>
+
+          <div className="dash-crew">
+            <Section title="TES POTES">
+              <MembersTab
+                members={members}
+                stages={stages}
+                participations={participations}
+                onStatusChange={onStatusChange}
+                onRemove={onRemove}
+              />
+            </Section>
+          </div>
+        </div>
+
+        {/* Réglages */}
+        <div style={{ marginTop: "40px", borderTop: `1px solid ${C.card2}`, paddingTop: "20px", maxWidth: "480px" }}>
+          {!settings ? (
+            <button onClick={() => setSettings(true)} style={{ background: "none", border: "none", color: C.muted, fontSize: "13px", cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+              ⚙ Réglages du trip
+            </button>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div>
+                <label style={label}>NOM</label>
+                <input value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} style={input} />
+              </div>
+              <div>
+                <label style={label}>DESCRIPTION</label>
+                <textarea rows={3} value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} style={{ ...input, resize: "vertical" }} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                <div>
+                  <label style={label}>DÉBUT</label>
+                  <input type="date" value={draft.date_start} onChange={e => setDraft({ ...draft, date_start: e.target.value })} style={input} />
+                </div>
+                <div>
+                  <label style={label}>FIN</label>
+                  <input type="date" value={draft.date_end} min={draft.date_start || undefined} onChange={e => setDraft({ ...draft, date_end: e.target.value })} style={input} />
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button onClick={() => setSettings(false)} style={{ flex: 1, background: C.bg, border: `1px solid ${C.green}`, color: C.muted, borderRadius: "100px", padding: "12px", cursor: "pointer", fontFamily: "inherit" }}>
+                  Annuler
+                </button>
+                <button onClick={saveSettings} style={{ flex: 1, background: C.accent, border: "none", color: "#0b120f", borderRadius: "100px", padding: "12px", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                  Enregistrer
+                </button>
+              </div>
+              <button onClick={deleteTrip} style={{ background: "none", border: "none", color: C.warn, fontSize: "13px", cursor: "pointer", padding: "8px 0 0", fontFamily: "inherit" }}>
+                Supprimer le trip
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   )
 }

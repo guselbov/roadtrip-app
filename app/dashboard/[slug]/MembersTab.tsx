@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatRange } from "@/lib/dates"
-import { C, avatarColor, card } from "@/lib/ui"
+import { C, avatarStyle, card } from "@/lib/ui"
 import type { MemberStatus, Participation, Stage, TripMember } from "@/lib/types"
 
 export function MembersTab({
@@ -49,7 +49,7 @@ export function MembersTab({
     return (
       <div style={{ ...card, marginBottom: "10px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
-          <span style={{ width: "36px", height: "36px", borderRadius: "50%", background: avatarColor(m.user_id), display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, flexShrink: 0 }}>
+          <span style={avatarStyle(m.user_id, 36)}>
             {name.charAt(0).toUpperCase()}
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
