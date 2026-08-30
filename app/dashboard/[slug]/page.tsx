@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase"
 import { notFound } from "next/navigation"
 import { DashboardClient } from "./DashboardClient"
+import { CopyCodeButton } from "./CopyCodeButton"
 
 export default async function DashboardPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -11,17 +12,28 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
   const { data: participations } = await supabase.from("participations").select("*, participants(name), stages(name, date_start, date_end, id)")
 
   return (
-    <main style={{color: "#e8e4d9", background: "#0e1409", minHeight: "100vh", padding: "0"}}>
+    <main style={{color: "#e8e4d9", background: "#0e1409", minHeight: "100vh"}}>
       <div style={{maxWidth: "900px", margin: "0 auto", padding: "24px 20px"}}>
 
-        {/* HEADER */}
-        <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "32px", flexWrap: "wrap", gap: "12px"}}>
+        <div style={{display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "32px", flexWrap: "wrap", gap: "16px"}}>
           <div>
             <p style={{color: "#7a8a6a", fontSize: "11px", letterSpacing: "1px", marginBottom: "4px"}}>DASHBOARD ADMIN</p>
-            <h1 style={{fontSize: "clamp(20px, 4vw, 28px)", fontWeight: "700"}}>{trip.title}</h1>
+            <h1 style={{fontSize: "clamp(20px, 4vw, 28px)", fontWeight: "700", marginBottom: "16px"}}>{trip.title}</h1>
+
+            <div style={{background: "#141a0e", border: "1px solid #2d4a1e", borderRadius: "16px", padding: "14px 18px", display: "inline-flex", flexDirection: "column", gap: "8px"}}>
+              <span style={{fontSize: "11px", color: "#7a8a6a", letterSpacing: "1px"}}>CODE DU TRIP — À PARTAGER À TES POTES</span>
+              <div style={{display: "flex", alignItems: "center", gap: "12px"}}>
+                <span style={{fontSize: "28px", fontWeight: "800", letterSpacing: "6px", color: "#8fb840", fontFamily: "monospace"}}>
+                  {trip.code || "—"}
+                </span>
+                <CopyCodeButton code={trip.code || ""} />
+              </div>
+              <span style={{fontSize: "12px", color: "#4a5a3a"}}>Tes potes entrent ce code sur l app pour rejoindre</span>
+            </div>
           </div>
-          <a href={"/trip/" + slug} style={{background: "#2d4a1e", color: "#8fb840", padding: "10px 20px", borderRadius: "100px", textDecoration: "none", fontSize: "13px", fontWeight: "600", border: "1px solid #3d6429", display: "flex", alignItems: "center", gap: "6px"}}>
-            👁 Voir la page publique
+
+          <a href={"/trip/" + slug} style={{background: "#2d4a1e", color: "#8fb840", padding: "10px 20px", borderRadius: "100px", textDecoration: "none", fontSize: "13px", fontWeight: "600", border: "1px solid #3d6429", display: "flex", alignItems: "center", gap: "6px", height: "fit-content"}}>
+            👁 Page publique
           </a>
         </div>
 
