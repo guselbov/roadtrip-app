@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatRange, spansOverlap, stageSpan } from "@/lib/dates"
+import { useConfirm } from "@/components/Confirm"
 import { dbError } from "@/lib/errors"
 import { C, btnPrimary, card, input, label, stageColor, tint } from "@/lib/ui"
 import type { Participation, Stage } from "@/lib/types"
@@ -47,6 +48,7 @@ export function StagesTab({
   const [draft, setDraft] = useState<Partial<Stage>>({})
   const [busy, setBusy] = useState<string | null>(null)
   const pickedRef = useRef(false)
+  const { ask, dialog } = useConfirm()
 
   // Les étapes deja datées : c'est contre elles qu'on vérifie les conflits.
   const booked = useMemo(
@@ -172,8 +174,15 @@ export function StagesTab({
 
   async function remove(s: Stage) {
     const n = new Set(participations.filter(p => p.stage_id === s.id).map(p => p.member_id)).size
-    const warn = n > 0 ? `\n\n${n} participation${n > 1 ? "s" : ""} y est rattachée et sera supprimée.` : ""
-    if (!confirm(`Supprimer l'étape « ${s.name} » ?${warn}`)) return
+    const ok = await ask({
+      title: `Supprimer l'étape « ${s.name} » ?`,
+      message: n > 0
+        ? `${n} participation${n > 1 ? "s y sont rattachées et seront supprimées" : " y est rattachée et sera supprimée"}, ainsi que la discussion, l'album et les activités de l'étape.`
+        : "La discussion, l'album et les activités de l'étape partent avec.",
+      confirmLabel: "Supprimer",
+      tone: "danger",
+    })
+    if (!ok) return
     const { error } = await supabase.from("stages").delete().eq("id", s.id)
     if (error) { setError(dbError(error)); return }
     onChange(stages.filter(x => x.id !== s.id))
@@ -223,6 +232,7 @@ export function StagesTab({
 
   const list = (
     <div>
+      {dialog}
       {booked.length > 0 && (
         <div style={{ ...card, marginBottom: "12px", padding: "12px 14px" }}>
           <div style={{ fontSize: "11px", color: C.muted, letterSpacing: "1px", marginBottom: "8px" }}>

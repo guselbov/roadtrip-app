@@ -88,6 +88,7 @@ components/
   JoinFlow.tsx                  # Dates → étapes pré-cochées → demande
   StagePanel.tsx                # Discussion + album + activités + aperçu photo
   DayPanel.tsx                  # Panneau latéral d'une journée du planning
+  Confirm.tsx                   # useConfirm() — remplace window.confirm
   ActivityList.tsx              # Liste votable + formulaire de proposition
   SessionSync.tsx               # Recharge quand le compte connecté change
   TripMap.tsx, ShareButton.tsx
@@ -131,6 +132,7 @@ app/
 - Vert principal : #2d4a1e · Accent : #8fb840
 - Texte : #e8e4d9 · Muet : #7a8a6a · Estompé : #4a5a3a
 - Mobile-first, bordures arrondies, pas de Tailwind. Tokens dans `lib/ui.ts`.
+- **Ne jamais utiliser `window.confirm` / `alert`** : la fenêtre native casse l'ambiance. Passer par `useConfirm()` de `components/Confirm.tsx`, qui s'utilise pareil (`if (!(await ask({...}))) return`).
 - Les styles sont écrits en ligne : impossible d'y mettre `:hover`. Les effets de survol vivent donc dans `globals.css`, en global (`filter: brightness`, qui ne dépend pas de la couleur) plus la classe `.hoverable` sur les cartes cliquables.
 - Les `<input>` font 16px minimum : en dessous, iOS zoome automatiquement au focus.
 

@@ -1,6 +1,7 @@
 "use client"
 import { useState } from "react"
 import { formatDay, formatTime } from "@/lib/dates"
+import { useConfirm } from "./Confirm"
 import { C, card, input, label, tint } from "@/lib/ui"
 import type { Activity } from "@/lib/types"
 
@@ -44,6 +45,17 @@ export function ActivityList({
 }) {
   const [pickingFor, setPickingFor] = useState<string | null>(null)
   const [pickedDay, setPickedDay] = useState("")
+  const { ask, dialog } = useConfirm()
+
+  async function askRemove(id: string, title: string) {
+    const ok = await ask({
+      title: `Supprimer « ${title} » ?`,
+      message: "L'activité et les votes du groupe disparaissent.",
+      confirmLabel: "Supprimer",
+      tone: "danger",
+    })
+    if (ok) onRemove(id)
+  }
 
   if (items.length === 0) {
     return <p style={{ color: C.dim, fontSize: "13px", padding: "16px 0", lineHeight: 1.5 }}>{emptyText}</p>
@@ -51,6 +63,7 @@ export function ActivityList({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      {dialog}
       {items.map(a => {
         const count = voteCount.get(a.id) ?? 0
         const voted = myVotes.has(a.id)
@@ -188,7 +201,7 @@ export function ActivityList({
                 )}
 
                 <button
-                  onClick={() => { if (confirm(`Supprimer « ${a.title} » ?`)) onRemove(a.id) }}
+                  onClick={() => askRemove(a.id, a.title)}
                   style={{ background: "none", border: "none", color: C.dim, fontSize: "12px", cursor: "pointer", padding: 0, fontFamily: "inherit", marginLeft: "auto" }}
                 >
                   Supprimer

@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatRange } from "@/lib/dates"
+import { useConfirm } from "@/components/Confirm"
 import { C, avatarStyle, card } from "@/lib/ui"
 import type { MemberStatus, Participation, Stage, TripMember } from "@/lib/types"
 
@@ -20,6 +21,7 @@ export function MembersTab({
 }) {
   const supabase = createClient()
   const [busy, setBusy] = useState<string | null>(null)
+  const { ask, dialog } = useConfirm()
 
   const stageName = new Map(stages.map(s => [s.id, s.name]))
   const partsOf = (memberId: string) => participations.filter(p => p.member_id === memberId)
@@ -36,7 +38,13 @@ export function MembersTab({
   }
 
   async function remove(id: string, name: string) {
-    if (!confirm(`Retirer ${name} du trip ? Ses étapes et sa participation seront supprimées.`)) return
+    const ok = await ask({
+      title: `Retirer ${name} du trip ?`,
+      message: "Ses dates et ses étapes seront supprimées. Il pourra refaire une demande avec le code.",
+      confirmLabel: "Retirer",
+      tone: "danger",
+    })
+    if (!ok) return
     setBusy(id)
     const { error } = await supabase.from("trip_members").delete().eq("id", id)
     setBusy(null)
@@ -97,6 +105,7 @@ export function MembersTab({
 
   return (
     <div>
+      {dialog}
       <section style={{ marginBottom: "28px" }}>
         <h3 style={{ fontSize: "13px", color: C.muted, letterSpacing: "1px", marginBottom: "12px" }}>
           EN ATTENTE {pending.length > 0 && `· ${pending.length}`}

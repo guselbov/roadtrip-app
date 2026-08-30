@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { ShareButton } from "@/components/ShareButton"
 import { StagePanel } from "@/components/StagePanel"
 import { DayPanel } from "@/components/DayPanel"
+import { useConfirm } from "@/components/Confirm"
 import { MembersTab } from "./MembersTab"
 import { StagesTab } from "./StagesTab"
 import { PlanningTab } from "./PlanningTab"
@@ -66,6 +67,7 @@ export function DashboardClient({
     date_end: initialTrip.date_end ?? "",
   })
   const [copied, setCopied] = useState(false)
+  const { ask, dialog } = useConfirm()
 
   // Les demandes arrivent pendant que l'organisateur regarde la page : sans
   // cette souscription, rien ne bouge tant qu'il ne recharge pas lui-même.
@@ -122,7 +124,13 @@ export function DashboardClient({
   }
 
   async function deleteTrip() {
-    if (!confirm(`Supprimer « ${trip.title} » ? Étapes, participations, messages et photos partent avec. C'est définitif.`)) return
+    const ok = await ask({
+      title: `Supprimer « ${trip.title} » ?`,
+      message: "Étapes, participations, discussions, photos et activités partent avec. C'est définitif.",
+      confirmLabel: "Supprimer le trip",
+      tone: "danger",
+    })
+    if (!ok) return
     const { error } = await supabase.from("roadtrips").delete().eq("id", trip.id)
     if (!error) {
       router.replace("/")
@@ -168,6 +176,8 @@ export function DashboardClient({
           .dash-crew { grid-column: auto; position: sticky; top: 16px; }
         }
       `}</style>
+
+      {dialog}
 
       <div className="dash">
         <Link href="/" style={{ color: C.muted, fontSize: "14px", textDecoration: "none", display: "inline-block", marginBottom: "14px" }}>
