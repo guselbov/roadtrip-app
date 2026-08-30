@@ -27,7 +27,7 @@ export default async function StagePage({ params }: { params: Promise<{ stageId:
 
   const { data: membership } = await supabase
     .from("trip_members")
-    .select("id, status")
+    .select("id, status, role")
     .eq("trip_id", stage.roadtrip_id)
     .eq("user_id", profile.id)
     .maybeSingle()
@@ -42,7 +42,12 @@ export default async function StagePage({ params }: { params: Promise<{ stageId:
         <Link href={"/trip/" + trip.slug} style={{ color: C.muted, fontSize: "14px", textDecoration: "none", display: "inline-block", marginBottom: "16px" }}>
           ← {trip.title}
         </Link>
-        <StagePanel stageId={stageId} me={profile} />
+        <StagePanel
+          stageId={stageId}
+          tripId={stage.roadtrip_id}
+          me={profile}
+          isOwner={membership?.role === "owner"}
+        />
       </div>
     </main>
   )

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { ShareButton } from "@/components/ShareButton"
 import { StagePanel } from "@/components/StagePanel"
+import { DayPanel } from "@/components/DayPanel"
 import { MembersTab } from "./MembersTab"
 import { StagesTab } from "./StagesTab"
 import { PlanningTab } from "./PlanningTab"
@@ -56,6 +57,7 @@ export function DashboardClient({
   const [members, setMembers] = useState(initialMembers)
   const [participations, setParticipations] = useState(initialParticipations)
   const [selectedStageId, setSelectedStageId] = useState<string | null>(initialStages[0]?.id ?? null)
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [settings, setSettings] = useState(false)
   const [draft, setDraft] = useState({
     title: initialTrip.title,
@@ -232,6 +234,8 @@ export function DashboardClient({
               participations={participations}
               tripStart={trip.date_start}
               tripEnd={trip.date_end}
+              selectedDay={selectedDay}
+              onSelectDay={setSelectedDay}
             />
           </Section>
         </div>
@@ -256,7 +260,7 @@ export function DashboardClient({
           <div className="dash-chat">
             <Section title={selectedStage ? "DISCUSSION · " + selectedStage.name.toUpperCase() : "DISCUSSION"}>
               {selectedStage ? (
-                <StagePanel key={selectedStage.id} stageId={selectedStage.id} me={me} showHeader={false} />
+                <StagePanel key={selectedStage.id} stageId={selectedStage.id} tripId={trip.id} me={me} isOwner showHeader={false} />
               ) : (
                 <div style={{ ...card, padding: "40px 24px", textAlign: "center", color: C.muted, fontSize: "14px", lineHeight: 1.6 }}>
                   <div style={{ fontSize: "30px", marginBottom: "10px" }}>💬</div>
@@ -320,6 +324,19 @@ export function DashboardClient({
           )}
         </div>
       </div>
+
+      {selectedDay && (
+        <DayPanel
+          day={selectedDay}
+          tripId={trip.id}
+          stages={stages}
+          members={members}
+          participations={participations}
+          me={me}
+          isOwner
+          onClose={() => setSelectedDay(null)}
+        />
+      )}
     </>
   )
 }

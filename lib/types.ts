@@ -107,3 +107,23 @@ export interface PublicTrip {
   member_count: number
   stages: (Stage & { people: number })[]
 }
+
+export type ActivityStatus = "proposed" | "scheduled" | "rejected"
+
+export interface Activity {
+  id: string
+  trip_id: string
+  stage_id: string | null
+  author_id: string
+  title: string
+  description: string | null
+  scheduled_on: string | null
+  status: ActivityStatus
+  created_at: string
+  profiles?: Profile
+}
+
+export interface ActivityVote {
+  activity_id: string
+  user_id: string
+}

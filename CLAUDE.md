@@ -16,7 +16,7 @@ Application web permettant de créer et organiser des roadtrips collaboratifs. L
 - **URL** : https://rzmdjmuiburllzylrvxe.supabase.co
 - **Clés** : uniquement via `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (`.env.local`, et variables d'env Vercel). Ne jamais réintroduire de valeur en dur dans le code.
 - **Storage bucket** : trip-photos (lecture publique, écriture authentifiée)
-- **Migrations** : `supabase/migrations/0001_auth_rls.sql` (schéma + RLS), `0002_stages_overlap_and_owner.sql` (chevauchement, présence de l'organisateur, profils orphelins)
+- **Migrations** : `0001_auth_rls.sql` (schéma + RLS), `0002_stages_overlap_and_owner.sql` (chevauchement, présence de l'organisateur, profils orphelins), `0003_activities.sql` (activités proposées et votées)
 
 ## Schéma base de données
 ```sql
@@ -49,6 +49,14 @@ id, stage_id, author_id, url, storage_path, created_at
 
 -- notifications : notifications in-app (alimentée par triggers uniquement)
 id, user_id, trip_id, stage_id, actor_id, type, payload, read_at, created_at
+
+-- activities : idées proposées par le groupe, rattachées à une étape
+id, trip_id, stage_id, author_id, title, description,
+scheduled_on, status (proposed|scheduled|rejected), created_at
+-- seul l'organisateur peut renseigner scheduled_on/status : trigger guard_activity_update
+
+-- activity_votes : un pouce par personne et par activité
+activity_id, user_id, created_at  -- clé primaire composée
 ```
 
 ## Sécurité — règles à ne pas casser
@@ -74,7 +82,9 @@ components/
   Landing.tsx, CodeEntry.tsx    # Accueil déconnecté, saisie du code
   TopBar.tsx, NotificationBell.tsx
   JoinFlow.tsx                  # Dates → étapes pré-cochées → demande
-  StagePanel.tsx                # Discussion + album + aperçu photo (autonome)
+  StagePanel.tsx                # Discussion + album + activités + aperçu photo
+  DayPanel.tsx                  # Panneau latéral d'une journée du planning
+  ActivityList.tsx              # Liste votable + formulaire de proposition
   SessionSync.tsx               # Recharge quand le compte connecté change
   TripMap.tsx, ShareButton.tsx
 app/
@@ -105,6 +115,7 @@ app/
 - Leaflet est chargé par `import()` dans un `useEffect` (la lib touche `window` au chargement)
 - Le lint embarque les règles du compilateur React : pas de `setState` synchrone dans un effet, pas d'accès à une fonction déclarée plus bas. Charger l'état initial côté serveur et le passer en prop.
 - **Étapes : `[arrivée, départ)`.** Le jour de départ reste libre pour l'étape suivante — Biarritz 28→29 puis Bayonne 29→31 est valide, les deux sur 28→29 ne l'est pas. Vérifié côté client (`stageSpan`/`spansOverlap`) *et* par le trigger `check_stage_overlap`, qui renvoie un message préfixé `CHEVAUCHEMENT|`.
+- **Les canaux Realtime portent un suffixe aléatoire par instance** : deux composants abonnés au même sujet feraient échouer le second `.on()` après `subscribe()`.
 - **L'organisateur est inscrit d'office sur chaque étape créée** (trigger `add_owner_participation`) et peut se retirer depuis l'onglet Étapes.
 - **Ne jamais utiliser `toISOString()` pour produire une date YYYY-MM-DD** : il convertit en UTC et décale d'un jour toute date à minuit heure française. Passer par `iso()` de `lib/dates.ts`, qui lit les composantes locales.
 - Tuiles de carte : fond sombre **Esri** (`World_Dark_Gray_Base`), gratuit et sans clé. Les tuiles CARTO exigent une clé API depuis 2024.
@@ -124,5 +135,6 @@ app/
 - [ ] Changement de mot de passe depuis `/compte` (aujourd'hui uniquement via « mot de passe oublié »)
 - [ ] Co-organisateurs (le schéma `trip_members.role` est déjà prêt)
 - [ ] Croisement pote ↔ pote (« toi et Théo à Biarritz du 15 au 17 »)
+- [ ] Activités visibles sur la page publique du trip (aujourd'hui réservées aux membres validés)
 - [ ] Tests e2e
 - [ ] PWA (manifest, service worker)

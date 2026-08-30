@@ -7,7 +7,7 @@ import { ShareButton } from "@/components/ShareButton"
 import { TripMap } from "@/components/TripMap"
 import { JoinFlow } from "@/components/JoinFlow"
 import { formatLongRange, formatRange } from "@/lib/dates"
-import { C, avatarStyle, card, container, page, stageColor } from "@/lib/ui"
+import { C, avatarStyle, card, page, stageColor } from "@/lib/ui"
 import type { MemberStatus, PublicTrip, Stage } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -78,7 +78,19 @@ export default async function TripPage({ params }: { params: Promise<{ slug: str
     <main style={page}>
       <TopBar profile={profile} next={tripUrl} />
 
-      <div style={{ ...container, paddingBottom: "60px" }}>
+      <style>{`
+        .trip { max-width: 480px; margin: 0 auto; padding: 0 20px 60px; }
+        .trip-grid { display: block; }
+        @media (min-width: 900px) {
+          .trip { max-width: 1040px; }
+          .trip-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+          .trip-left { position: sticky; top: 16px; }
+        }
+      `}</style>
+
+      <div className="trip">
+        <div className="trip-grid">
+        <div className="trip-left">
         {/* HERO */}
         <div style={{ marginBottom: "24px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "14px" }}>
@@ -103,7 +115,7 @@ export default async function TripPage({ params }: { params: Promise<{ slug: str
         {/* CARTE */}
         {stages.some(s => s.lat != null) && (
           <div style={{ marginBottom: "20px" }}>
-            <TripMap points={stages.map((s, i) => ({ id: s.id, name: s.name, lat: s.lat, lng: s.lng, color: stageColor(i) }))} />
+            <TripMap points={stages.map((s, i) => ({ id: s.id, name: s.name, lat: s.lat, lng: s.lng, color: stageColor(i) }))} height={300} />
           </div>
         )}
 
@@ -221,6 +233,9 @@ export default async function TripPage({ params }: { params: Promise<{ slug: str
           )}
         </div>
 
+        </div>
+
+        <div className="trip-right">
         {/* ÉQUIPAGE */}
         {isApproved && crew.length > 0 && (
           <div style={{ marginBottom: "28px" }}>
@@ -293,6 +308,8 @@ export default async function TripPage({ params }: { params: Promise<{ slug: str
             🔒 La messagerie et l&apos;album de chaque étape s&apos;ouvrent une fois ta place validée par l&apos;organisateur.
           </p>
         )}
+        </div>
+        </div>
       </div>
     </main>
   )

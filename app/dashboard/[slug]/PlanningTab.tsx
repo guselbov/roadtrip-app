@@ -10,12 +10,16 @@ export function PlanningTab({
   participations,
   tripStart,
   tripEnd,
+  selectedDay,
+  onSelectDay,
 }: {
   stages: Stage[]
   members: TripMember[]
   participations: Participation[]
   tripStart: string | null
   tripEnd: string | null
+  selectedDay?: string | null
+  onSelectDay?: (day: string) => void
 }) {
   const approved = members.filter(m => m.status === "approved")
 
@@ -53,13 +57,18 @@ export function PlanningTab({
 
   return (
     <div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "14px" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "14px", alignItems: "center" }}>
         {stages.map(s => (
           <span key={s.id} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: C.muted }}>
             <span style={{ width: "10px", height: "10px", borderRadius: "3px", background: colorOf.get(s.id) }} />
             {s.name}
           </span>
         ))}
+        {onSelectDay && (
+          <span style={{ fontSize: "11px", color: C.dim, marginLeft: "auto" }}>
+            Clique un jour pour son programme
+          </span>
+        )}
       </div>
 
       <div style={{ overflowX: "auto", background: C.card, border: `1px solid ${C.card2}`, borderRadius: "18px", padding: "14px" }}>
@@ -70,11 +79,30 @@ export function PlanningTab({
             {days.map(d => {
               const date = toDate(d)
               const weekend = date.getDay() === 0 || date.getDay() === 6
+              const active = selectedDay === d
               return (
-                <div key={d} style={{ width: CELL + "px", flexShrink: 0, textAlign: "center", fontSize: "10px", color: weekend ? C.accent : C.dim, lineHeight: 1.2 }}>
-                  <div>{date.toLocaleDateString("fr-FR", { weekday: "narrow" })}</div>
-                  <div style={{ fontWeight: 700 }}>{date.getDate()}</div>
-                </div>
+                <button
+                  key={d}
+                  onClick={() => onSelectDay?.(d)}
+                  title="Voir et modifier cette journée"
+                  style={{
+                    width: CELL + "px",
+                    flexShrink: 0,
+                    textAlign: "center",
+                    fontSize: "10px",
+                    color: active ? "#0b120f" : weekend ? C.accent : C.dim,
+                    background: active ? C.accent : "transparent",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "2px 0",
+                    lineHeight: 1.2,
+                    cursor: onSelectDay ? "pointer" : "default",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  <span style={{ display: "block" }}>{date.toLocaleDateString("fr-FR", { weekday: "narrow" })}</span>
+                  <span style={{ display: "block", fontWeight: 800 }}>{date.getDate()}</span>
+                </button>
               )
             })}
           </div>
@@ -96,7 +124,7 @@ export function PlanningTab({
                 {days.map(d => {
                   const here = parts.find(p => d >= p.date_start && d <= p.date_end)
                   return (
-                    <div key={d} style={{ width: CELL + "px", flexShrink: 0, padding: "0 1px" }}>
+                    <div key={d} style={{ width: CELL + "px", flexShrink: 0, padding: "0 1px", background: selectedDay === d ? "rgba(163,230,53,0.08)" : "transparent" }}>
                       <div
                         title={here ? stages.find(s => s.id === here.stage_id)?.name : undefined}
                         style={{

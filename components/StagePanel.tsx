@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatRange } from "@/lib/dates"
+import { useActivities } from "@/lib/useActivities"
+import { ActivityForm, ActivityList } from "./ActivityList"
 import { dbError } from "@/lib/errors"
 import { C, avatarStyle, card, input } from "@/lib/ui"
 import type { Message, Photo, Profile } from "@/lib/types"
@@ -16,15 +18,21 @@ interface StageInfo { id: string; name: string; description: string | null; date
  */
 export function StagePanel({
   stageId,
+  tripId,
   me,
+  isOwner = false,
   showHeader = true,
 }: {
   stageId: string
+  tripId: string
   me: Profile
+  isOwner?: boolean
   showHeader?: boolean
 }) {
   const [supabase] = useState(() => createClient())
-  const [tab, setTab] = useState<"chat" | "album">("chat")
+  // Nom de canal unique : le même panneau peut être monté deux fois.
+  const [channelId] = useState(() => Math.random().toString(36).slice(2, 9))
+  const [tab, setTab] = useState<"chat" | "album" | "activites">("chat")
   const [stage, setStage] = useState<StageInfo | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
@@ -36,6 +44,7 @@ export function StagePanel({
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState("")
   const [lightbox, setLightbox] = useState<number | null>(null)
+  const acts = useActivities(tripId, me.id)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -96,7 +105,7 @@ export function StagePanel({
     let loaded = false
 
     const channel = supabase
-      .channel("stage-" + stageId)
+      .channel(`stage-${stageId}-${channelId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `stage_id=eq.${stageId}` }, payload => {
         const msg = payload.new as Message
         setMessages(prev => (prev.some(x => x.id === msg.id) ? prev : [...prev, msg]))
@@ -112,7 +121,7 @@ export function StagePanel({
       .subscribe(() => { if (!loaded) { loaded = true; load() } })
 
     return () => { supabase.removeChannel(channel) }
-  }, [supabase, stageId, load, resolveName])
+  }, [supabase, stageId, channelId, load, resolveName])
 
   useEffect(() => {
     if (tab === "chat" && ready) bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -186,6 +195,11 @@ export function StagePanel({
     fontFamily: "inherit",
   })
 
+  // Les mieux votées remontent : c'est tout l'intérêt du vote.
+  const stageActivities = acts.activities
+    .filter(a => a.stage_id === stageId)
+    .sort((x, y) => (acts.voteCount.get(y.id) ?? 0) - (acts.voteCount.get(x.id) ?? 0))
+
   const current = lightbox !== null ? photos[lightbox] : null
 
   return (
@@ -226,11 +240,14 @@ export function StagePanel({
         <button onClick={() => setTab("album")} style={tabBtn(tab === "album")}>
           Album {photos.length > 0 && `· ${photos.length}`}
         </button>
+        <button onClick={() => setTab("activites")} style={tabBtn(tab === "activites")}>
+          Activités {stageActivities.length > 0 && `· ${stageActivities.length}`}
+        </button>
       </div>
 
       {error && <p style={{ color: C.warn, fontSize: "13px", marginBottom: "10px" }}>{error}</p>}
 
-      {!ready && <p style={{ color: C.dim, fontSize: "13px", padding: "20px 0", textAlign: "center" }}>Chargement…</p>}
+      {!ready && tab !== "activites" && <p style={{ color: C.dim, fontSize: "13px", padding: "20px 0", textAlign: "center" }}>Chargement…</p>}
 
       {ready && tab === "chat" && (
         <>
@@ -310,6 +327,29 @@ export function StagePanel({
               ))}
             </div>
           )}
+        </>
+      )}
+
+      {tab === "activites" && (
+        <>
+          {acts.error && <p style={{ color: C.warn, fontSize: "13px", marginBottom: "10px" }}>{acts.error}</p>}
+          <ActivityList
+            items={stageActivities}
+            voteCount={acts.voteCount}
+            myVotes={acts.myVotes}
+            meId={me.id}
+            isOwner={isOwner}
+            dayMin={stage?.date_start}
+            dayMax={stage?.date_end}
+            onToggleVote={acts.toggleVote}
+            onSchedule={acts.schedule}
+            onRemove={acts.remove}
+            emptyText="Aucune idée pour cette étape. Lance la première, tes potes voteront."
+          />
+          <ActivityForm onSubmit={(title, description) => acts.propose({ title, description, stageId })} />
+          <p style={{ fontSize: "11px", color: C.dim, marginTop: "10px", lineHeight: 1.5 }}>
+            👍 dit simplement « ça me tente ». {isOwner ? "À toi de retenir les idées et de les caler sur une journée." : "L'organisateur retient les idées et les cale sur une journée."}
+          </p>
         </>
       )}
 
