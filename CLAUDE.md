@@ -136,7 +136,62 @@ app/
 - Les styles sont écrits en ligne : impossible d'y mettre `:hover`. Les effets de survol vivent donc dans `globals.css`, en global (`filter: brightness`, qui ne dépend pas de la couleur) plus la classe `.hoverable` sur les cartes cliquables.
 - Les `<input>` font 16px minimum : en dessous, iOS zoome automatiquement au focus.
 
-## Ce qui reste à faire
+## À faire — prochaine session
+
+Trois chantiers, dans l'ordre de priorité. Tous décidés le 30 août 2026, à ne
+pas réinterpréter : ce sont des demandes explicites.
+
+### 1. Le planning doit devenir un vrai agenda
+
+Aujourd'hui `PlanningTab` affiche une frise de colonnes étroites dont l'en-tête
+est une lettre (`S`, `D`) et un numéro. Ce n'est pas lisible.
+
+- Remplacer les colonnes-lettres par de **vraies cases de jour**, cliquables et
+  assez grandes pour se lire.
+- Au clic, `DayPanel` doit ressembler à **Google Agenda** : une grille horaire
+  de la journée, avec les activités posées à leur heure (`starts_at`) plutôt
+  qu'en simple liste.
+- **Sous** cette grille horaire, les activités proposées pour ce jour-là (celles
+  qui ne sont pas encore retenues). L'ordre compte : la grille d'abord, les
+  propositions en dessous.
+
+### 2. Réorganiser le dashboard organisateur
+
+L'ordre vertical actuel ne reflète pas l'urgence réelle.
+
+- **Les demandes en attente passent tout en haut**, avant même le code de
+  partage. Elles ne doivent jamais être sous quoi que ce soit.
+- **Le code de partage devient discret** : soit nettement plus petit, soit un
+  carré isolé complètement à gauche, hors du flux principal. Ce n'est pas
+  l'information la plus importante de l'écran.
+- **Les activités proposées prennent place en bas à droite**, juste au-dessus
+  de la colonne « Tes potes » (demandes en attente + équipage).
+
+### 3. Rééquilibrer la page d'une étape sur ordinateur
+
+`StagePanel` empile discussion, album et activités en une colonne : sur un
+écran large, ça reste un format téléphone étiré.
+
+- Passer en **trois zones** au-delà d'une largeur à définir :
+  - **Discussion** à gauche (ou au centre), la plus large — c'est le cœur
+  - **Activités** en haut à droite
+  - **Album** en bas à droite
+- Objectif énoncé : « plus équilibré, plus ergonomique ».
+
+### Points ouverts, à trancher avec Augustin
+
+- **Carte de la page publique** : jugée trop peu détaillée. Reste à décider —
+  zoom plus proche, fond de carte différent, ou tracé de l'itinéraire réel
+  plutôt que la ligne droite actuelle ?
+- **Voir ses potes sur la page publique** : demandé, mais l'équipage n'est
+  aujourd'hui visible que des membres validés (règle de sécurité posée en
+  0001). Jusqu'où ouvrir ?
+- **Heure par défaut d'une activité** : le champ heure est obligatoire et le
+  navigateur y met l'heure courante, d'où des activités à « 01h27 ». Proposer
+  un créneau par défaut (10h ?) ou une case « toute la journée ».
+
+## Plus tard
+
 - [ ] Notifications email (Resend) en complément des notifs in-app
 - [ ] Décider de la confirmation d'email à l'inscription (désactivée aujourd'hui : n'importe qui peut s'inscrire avec l'adresse d'un autre)
 - [ ] Changement de mot de passe depuis `/compte` (aujourd'hui uniquement via « mot de passe oublié »)
@@ -145,3 +200,13 @@ app/
 - [ ] Activités visibles sur la page publique du trip (aujourd'hui réservées aux membres validés)
 - [ ] Tests e2e
 - [ ] PWA (manifest, service worker)
+
+## État au 30 août 2026
+
+- Les 4 migrations sont appliquées en production.
+- Comptes de test à supprimer quand le vrai test entre potes commencera :
+  `augustin.bayle+orga@`, `+pote@`, `+p1@`, `+p2@`, `+test3@` (mot de passe
+  `RoadTrip2026!`), et les trips « Test chevauchement » (4EGZBP) et
+  « Test notif prod » (RU7TWB).
+- Le déploiement Vercel **ne part pas tout seul au push** : la connexion Git du
+  projet ne déclenche rien. Déployer avec `npx vercel --prod --yes`.
