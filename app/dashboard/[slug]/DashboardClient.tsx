@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -11,7 +11,7 @@ import { formatLongRange } from "@/lib/dates"
 import { C, card, container, input, label } from "@/lib/ui"
 import type { MemberStatus, Participation, Stage, Trip, TripMember } from "@/lib/types"
 
-type Tab = "potes" | "etapes" | "planning"
+type Tab = "planning" | "potes" | "etapes"
 
 export function DashboardClient({
   trip: initialTrip,
@@ -30,7 +30,7 @@ export function DashboardClient({
   const [stages, setStages] = useState(initialStages)
   const [members, setMembers] = useState(initialMembers)
   const [participations, setParticipations] = useState(initialParticipations)
-  const [tab, setTab] = useState<Tab>("potes")
+  const [tab, setTab] = useState<Tab>("planning")
   const [settings, setSettings] = useState(false)
   const [draft, setDraft] = useState({
     title: initialTrip.title,
@@ -39,6 +39,31 @@ export function DashboardClient({
     date_end: initialTrip.date_end ?? "",
   })
   const [copied, setCopied] = useState(false)
+
+  // Les demandes arrivent pendant que l'organisateur regarde la page : sans
+  // cette souscription, rien ne bouge tant qu'il ne recharge pas lui-meme.
+  useEffect(() => {
+    const channel = supabase
+      .channel("trip-members-" + trip.id)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "trip_members", filter: `trip_id=eq.${trip.id}` },
+        () => { router.refresh() }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [supabase, trip.id, router])
+
+  // Le rendu serveur fait autorite : on resynchronise quand router.refresh()
+  // renvoie de nouvelles donnees. Ajustement pendant le rendu plutot qu'en
+  // effet, comme recommande par React pour un etat derive de props.
+  const [seen, setSeen] = useState({ m: initialMembers, p: initialParticipations, s: initialStages })
+  if (seen.m !== initialMembers || seen.p !== initialParticipations || seen.s !== initialStages) {
+    setSeen({ m: initialMembers, p: initialParticipations, s: initialStages })
+    setMembers(initialMembers)
+    setParticipations(initialParticipations)
+    setStages(initialStages)
+  }
 
   const pendingCount = members.filter(m => m.status === "pending").length
   const approvedCount = members.filter(m => m.status === "approved" && m.role !== "owner").length
@@ -86,9 +111,9 @@ export function DashboardClient({
   }
 
   const TABS: { key: Tab; text: string; badge?: number }[] = [
+    { key: "planning", text: "Planning" },
     { key: "potes", text: "Potes", badge: pendingCount },
     { key: "etapes", text: "Étapes" },
-    { key: "planning", text: "Planning" },
   ]
 
   return (
@@ -120,6 +145,25 @@ export function DashboardClient({
           </Link>
         </div>
       </div>
+
+      {/* Les demandes ne doivent pas dependre de l'onglet ouvert */}
+      {pendingCount > 0 && (
+        <button
+          onClick={() => setTab("potes")}
+          style={{ width: "100%", background: C.accent, color: C.bg, border: "none", borderRadius: "16px", padding: "14px 16px", marginBottom: "14px", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "12px", textAlign: "left" }}
+        >
+          <span style={{ fontSize: "20px" }}>🔔</span>
+          <span style={{ flex: 1 }}>
+            <span style={{ display: "block", fontWeight: 800, fontSize: "15px" }}>
+              {pendingCount} pote{pendingCount > 1 ? "s" : ""} attend{pendingCount > 1 ? "ent" : ""} ta réponse
+            </span>
+            <span style={{ display: "block", fontSize: "13px", opacity: 0.75 }}>
+              Valide ou refuse pour débloquer {pendingCount > 1 ? "leur" : "son"} accès
+            </span>
+          </span>
+          <span style={{ fontSize: "18px", opacity: 0.6 }}>→</span>
+        </button>
+      )}
 
       {/* Onglets */}
       <div style={{ display: "flex", gap: "6px", marginBottom: "20px" }}>
